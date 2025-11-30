@@ -1,0 +1,219 @@
+body {
+  margin: 0;
+  background: #0a0a0a;
+  color: white;
+  text-align: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding-bottom: 50px;
+}
+
+h1 {
+  margin: 20px;
+  color: #ddd;
+  font-weight: 300;
+  letter-spacing: 2px;
+}
+
+.control-panel {
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.group {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+/* ボタン共通 */
+button {
+  background: #333;
+  color: white;
+  border: 1px solid #555;
+  padding: 6px 15px;
+  cursor: pointer;
+  font-size: 14px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+button:hover {
+  background: #444;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button.active {
+  background: #d32f2f;
+  border-color: #ff5252;
+}
+
+/* 録音ボタン専用 */
+.record-btn {
+  color: #ff5555;
+  border-color: #553333;
+}
+.record-btn.recording {
+  background: #500;
+  color: white;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+}
+
+.player-container {
+  margin-bottom: 10px;
+}
+
+audio {
+  width: 90%;
+  max-width: 600px;
+  height: 40px;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 350px;
+  margin: 0 auto;
+  background: #000;
+  border-top: 1px solid #333;
+  border-bottom: 1px solid #333;
+  cursor: crosshair;
+}
+
+input[type="file"] {
+  font-size: 12px;
+  color: #aaa;
+}
+
+/* --- チャットエリアのスタイル --- */
+.chat-container {
+  width: 90%;
+  max-width: 800px;
+  margin: 30px auto;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.chat-header {
+  background: #1a1a1a;
+  padding: 10px 15px;
+  border-bottom: 1px solid #333;
+  font-size: 14px;
+  font-weight: bold;
+  color: #aaa;
+  text-align: left;
+}
+
+.chat-history {
+  height: 300px;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  background: #0e0e0e;
+}
+
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  max-width: 80%;
+}
+
+.chat-message.user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.chat-message.ai {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.message-content {
+  padding: 10px 15px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+  word-wrap: break-word;
+}
+
+.chat-message.user .message-content {
+  background: #005a9e;
+  color: white;
+  border-bottom-right-radius: 2px;
+}
+
+.chat-message.ai .message-content {
+  background: #222;
+  border: 1px solid #444;
+  color: #eee;
+  border-bottom-left-radius: 2px;
+}
+
+/* Markdown用スタイル調整 */
+.message-content p { margin: 0 0 10px 0; }
+.message-content p:last-child { margin: 0; }
+.message-content ul, .message-content ol { padding-left: 20px; margin: 5px 0; }
+.message-content code { background: #333; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+.message-content pre { background: #000; padding: 10px; border-radius: 5px; overflow-x: auto; }
+
+.chat-input-area {
+  padding: 15px;
+  background: #1a1a1a;
+  border-top: 1px solid #333;
+}
+
+.chat-options {
+  text-align: left;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #ccc;
+}
+
+.input-row {
+  display: flex;
+  gap: 10px;
+}
+
+textarea#chatInput {
+  flex: 1;
+  height: 50px;
+  background: #222;
+  border: 1px solid #444;
+  color: white;
+  padding: 10px;
+  border-radius: 4px;
+  resize: none;
+  font-family: sans-serif;
+}
+
+textarea#chatInput:focus {
+  outline: none;
+  border-color: #0078d4;
+}
+
+#sendChatBtn {
+  height: 50px; /* textareaと同じ高さに */
+  background: #0078d4;
+  border: none;
+  font-weight: bold;
+}
+#sendChatBtn:hover {
+  background: #1084e0;
+}
