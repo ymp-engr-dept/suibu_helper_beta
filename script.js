@@ -9,6 +9,13 @@ const a4Input = document.getElementById("a4Input");
 const showHarmonicsCheckbox = document.getElementById("showHarmonicsCheckbox");
 const saveCompareBtn = document.getElementById("saveCompareBtn");
 const showCompareCheckbox = document.getElementById("showCompareCheckbox");
+const sourceModeCheckbox = document.getElementById("sourceModeCheckbox");
+const audioSeekBar = document.getElementById("audioSeekBar");
+const currentTimeDisplay = document.getElementById("currentTimeDisplay");
+const durationDisplay = document.getElementById("durationDisplay");
+const playPauseBtn = document.getElementById("playPauseBtn");
+const volumeSlider = document.getElementById("volumeSlider");
+const playbackRateSelect = document.getElementById("playbackRateSelect");
 
 // AI関連のDOM
 const chatHistory = document.getElementById("chatHistory");
@@ -46,6 +53,10 @@ let detectedFundamentalFreq = null;
 
 // 比較用データを格納する変数
 let comparisonDataArray = null;
+
+// フラグ
+let isFileMode = false; // false=Mic, true=File
+let isScrubbing = false; // スライダー操作中かどうか
 
 function resize() {
   canvas.width = window.innerWidth;
@@ -85,7 +96,7 @@ async function initAudio() {
   analyser.fftSize = 2048;
   analyser.smoothingTimeConstant = 0.6; 
 
-  // マイク入力
+  // マイク入力セットアップ
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -96,8 +107,7 @@ async function initAudio() {
   if (stream) {
     micSource = audioContext.createMediaStreamSource(stream);
     
-    // 録音機能の準備
-    // OpenAIが受け入れやすい形式を優先
+    // 録音機能 (既存コード維持)
     let options = {};
     if (MediaRecorder.isTypeSupported('audio/webm')) {
       options = { mimeType: 'audio/webm' };
@@ -115,44 +125,69 @@ async function initAudio() {
     mediaRecorder.onstop = () => {
       const audioBlob = new Blob(audioChunks, { type: recordedMimeType });
       currentAudioBlob = audioBlob; 
-      
       const audioUrl = URL.createObjectURL(audioBlob);
       audioPlayer.src = audioUrl;
-      audioChunks = []; 
+      audioChunks = [];
+      
+      // 録音完了したら自動でファイルモードに切り替えると親切
+      sourceModeCheckbox.checked = true;
+      updateSourceRouting();
     };
   }
 
   // プレイヤーソース作成
   playerSource = audioContext.createMediaElementSource(audioPlayer);
 
-  // ルーティング開始
-  if (micSource) connectMic();
-
-  // イベント監視
-  audioPlayer.onplay = () => {
+  // ▼▼▼ オーディオプレイヤーのイベント監視 (UI同期) ▼▼▼
+  
+  // 再生開始時
+  audioPlayer.addEventListener('play', () => {
     if (audioContext.state === 'suspended') audioContext.resume();
-    connectPlayer();
-  };
-  audioPlayer.onpause = () => connectMic();
-  audioPlayer.onended = () => connectMic();
+    playPauseBtn.textContent = "❚❚"; // 一時停止アイコン
+    if (sourceModeCheckbox.checked) updateSourceRouting();
+  });
 
+  // 一時停止時
+  audioPlayer.addEventListener('pause', () => {
+    playPauseBtn.textContent = "▶"; // 再生アイコン
+    // pause時はルーティングを切る必要はない (スクラブ操作などのため接続維持推奨)
+  });
+
+  // 再生終了時
+  audioPlayer.addEventListener('ended', () => {
+    playPauseBtn.textContent = "▶";
+  });
+
+  // 初期ルーティング実行
+  updateSourceRouting();
   draw();
 }
 
-function connectMic() {
-  if (!analyser || !micSource) return;
-  try { playerSource.disconnect(); } catch(e){}
-  try { 
-    micSource.disconnect(); 
-    micSource.connect(analyser);
-  } catch(e){}
-}
+function updateSourceRouting() {
+  if (!analyser) return;
 
-function connectPlayer() {
-  if (!analyser || !playerSource) return;
-  try { micSource.disconnect(); } catch(e){}
-  playerSource.connect(analyser);
-  analyser.connect(audioContext.destination);
+  isFileMode = sourceModeCheckbox.checked;
+
+  // ▼▼▼ 新しいUIパーツの有効/無効切り替え ▼▼▼
+  const uiElements = [audioSeekBar, playPauseBtn, volumeSlider, playbackRateSelect];
+  uiElements.forEach(el => el.disabled = !isFileMode);
+  
+  // モードOFFなら不透明度を下げて視覚的に無効化
+  document.querySelector('.player-controls-group').style.opacity = isFileMode ? "1" : "0.6";
+
+  if (isFileMode) {
+    // --- 音源モード ---
+    try { micSource.disconnect(); } catch(e){}
+    try { 
+      playerSource.connect(analyser);
+      analyser.connect(audioContext.destination); 
+    } catch(e){}
+  } else {
+    // --- マイクモード ---
+    try { playerSource.disconnect(); } catch(e){}
+    try { analyser.disconnect(audioContext.destination); } catch(e){}
+    try { micSource.connect(analyser); } catch(e){}
+  }
 }
 
 
@@ -221,6 +256,128 @@ saveCompareBtn.addEventListener("click", () => {
     setTimeout(() => saveCompareBtn.textContent = originalText, 1000);
   }
 });
+
+// モード切替スイッチ
+sourceModeCheckbox.addEventListener("change", () => {
+  if (!audioContext) initAudio();
+  updateSourceRouting();
+});
+
+// ファイル読み込み時
+fileInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    currentAudioBlob = file; 
+    recordedMimeType = file.type;
+    const url = URL.createObjectURL(file);
+    audioPlayer.src = url;
+    
+    // 自動でモードON
+    sourceModeCheckbox.checked = true;
+    updateSourceRouting();
+  }
+});
+
+// --- シークバー & タイム表示ロジック ---
+
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// メタデータ読み込み完了（長さ確定）
+audioPlayer.addEventListener('loadedmetadata', () => {
+  audioSeekBar.max = audioPlayer.duration;
+  durationDisplay.textContent = formatTime(audioPlayer.duration);
+});
+
+// 再生中のスライダー自動更新
+audioPlayer.addEventListener('timeupdate', () => {
+  if (!isScrubbing) {
+    audioSeekBar.value = audioPlayer.currentTime;
+    currentTimeDisplay.textContent = formatTime(audioPlayer.currentTime);
+  }
+});
+
+// スライダー操作開始 (ドラッグ中)
+audioSeekBar.addEventListener('mousedown', () => { isScrubbing = true; });
+audioSeekBar.addEventListener('touchstart', () => { isScrubbing = true; }, {passive: true});
+
+// スライダー操作中 (スクラブ)
+audioSeekBar.addEventListener('input', () => {
+  if (!audioContext) initAudio();
+  
+  const time = parseFloat(audioSeekBar.value);
+  audioPlayer.currentTime = time;
+  currentTimeDisplay.textContent = formatTime(time);
+  });
+
+audioSeekBar.addEventListener('mouseup', () => { isScrubbing = false; });
+audioSeekBar.addEventListener('touchend', () => { isScrubbing = false; });
+
+// 再生/一時停止ボタン
+playPauseBtn.addEventListener("click", () => {
+  if (!audioContext) initAudio();
+  
+  if (audioPlayer.paused) {
+    audioPlayer.play();
+  } else {
+    audioPlayer.pause();
+  }
+});
+
+// 音量スライダー
+volumeSlider.addEventListener("input", (e) => {
+  audioPlayer.volume = parseFloat(e.target.value);
+});
+
+// 再生速度選択
+playbackRateSelect.addEventListener("change", (e) => {
+  audioPlayer.playbackRate = parseFloat(e.target.value);
+});
+
+
+// --- シークバー関連 (既存コードの確認と微調整) ---
+
+// formatTime関数 (既存)
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// メタデータ読み込み時
+audioPlayer.addEventListener('loadedmetadata', () => {
+  audioSeekBar.max = audioPlayer.duration;
+  durationDisplay.textContent = formatTime(audioPlayer.duration);
+  // 初期状態UIリセット
+  playPauseBtn.textContent = "▶";
+});
+
+// 再生中の更新
+audioPlayer.addEventListener('timeupdate', () => {
+  if (!isScrubbing) {
+    audioSeekBar.value = audioPlayer.currentTime;
+    currentTimeDisplay.textContent = formatTime(audioPlayer.currentTime);
+  }
+});
+
+// スクラブ操作 (既存コード)
+audioSeekBar.addEventListener('mousedown', () => { isScrubbing = true; });
+audioSeekBar.addEventListener('touchstart', () => { isScrubbing = true; }, {passive: true});
+
+audioSeekBar.addEventListener('input', () => {
+  if (!audioContext) initAudio();
+  const time = parseFloat(audioSeekBar.value);
+  
+  // シーク位置を即時反映
+  audioPlayer.currentTime = time;
+  currentTimeDisplay.textContent = formatTime(time);
+});
+
+audioSeekBar.addEventListener('mouseup', () => { isScrubbing = false; });
+audioSeekBar.addEventListener('touchend', () => { isScrubbing = false; });
 
 // --- 描画ループ ---
 const dataArray = new Uint8Array(2048); 
