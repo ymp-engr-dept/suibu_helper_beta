@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Audio Lab - Gemini搭載スペクトラムアナライザ</title>
+  <title>スペクトラムアナライザ</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-  <h1>AI Audio Lab Pro</h1>
+  <h1>スペクトラムアナライザ</h1>
 
   <div class="control-panel">
     <div class="group">
@@ -31,16 +31,54 @@
         <input type="checkbox" id="showCompareCheckbox"> 比較表示
       </label>
       <button id="freezeBtn" style="margin-left: 15px;">フリーズ</button>
-    </div>
 
-    <div class="group">
       <button id="recordBtn" class="record-btn">● 録音</button>
       <input type="file" id="fileInput" accept="audio/*" />
-    </div>
-  </div>
 
   <div class="player-container">
-    <audio id="audioPlayer" controls></audio>
+    <audio id="audioPlayer" style="display: none;"></audio>
+  </div>
+
+  <div class="control-panel">
+    <div class="group player-controls-group">
+      
+      <div class="control-row left">
+        <div class="mode-switch">
+          <label class="toggle-label" title="マイク入力とファイル音源を切り替えます">
+            <input type="checkbox" id="sourceModeCheckbox">
+            <span class="toggle-text">音源モード</span>
+          </label>
+        </div>
+
+        <button id="playPauseBtn" class="icon-btn" disabled title="再生/一時停止">
+          ▶
+        </button>
+      </div>
+
+      <div class="seek-container">
+        <span id="currentTimeDisplay">0:00</span>
+        <input type="range" id="audioSeekBar" value="0" step="0.01" min="0" max="100" disabled>
+        <span id="durationDisplay">0:00</span>
+      </div>
+
+      <div class="control-row right">
+        <div class="vol-container" title="音量">
+          <span class="icon">🔊</span>
+          <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1" disabled>
+        </div>
+
+        <select id="playbackRateSelect" disabled title="再生速度">
+          <option value="0.25">0.25x</option>
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1.0" selected>1.0x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2.0">2.0x</option>
+        </select>
+      </div>
+    </div>
+    </div>
   </div>
 
   <canvas id="analyzer"></canvas>
