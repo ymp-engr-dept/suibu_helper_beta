@@ -217,3 +217,192 @@ textarea#chatInput:focus {
 #sendChatBtn:hover {
   background: #1084e0;
 }
+
+.player-controls-group {
+  background: #1a1a1a;
+  padding: 8px 15px;
+  border-radius: 6px;
+  border: 1px solid #333;
+  margin-top: 5px;
+  width: 90%;
+  max-width: 700px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.mode-switch {
+  display: flex;
+  align-items: center;
+  margin-right: 20px;
+}
+
+.toggle-label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #aaa;
+  font-weight: bold;
+}
+
+.toggle-label input {
+  transform: scale(1.2);
+  accent-color: #0078d4;
+}
+
+.toggle-label input:checked + .toggle-text {
+  color: #0078d4;
+  text-shadow: 0 0 5px rgba(0, 120, 212, 0.5);
+}
+
+.seek-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 300px;
+}
+
+input[type="range"]#audioSeekBar {
+  flex: 1;
+  height: 6px;
+  background: #333;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none; /* Chrome/Safari用リセット */
+  appearance: none;
+}
+
+/* スライダーのつまみ (Thumb) のスタイル */
+input[type="range"]#audioSeekBar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #ddd;
+  border-radius: 50%;
+  border: 2px solid #0078d4;
+  transition: transform 0.1s;
+}
+
+input[type="range"]#audioSeekBar::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: #fff;
+}
+
+#currentTimeDisplay, #durationDisplay {
+  font-family: monospace;
+  font-size: 12px;
+  color: #888;
+  width: 40px;
+  text-align: center;
+}
+
+.player-controls-group {
+  background: #1a1a1a;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #333;
+  margin-top: 5px;
+  width: 95%;
+  max-width: 800px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 再生ボタン */
+.icon-btn {
+  background: #333;
+  border: 1px solid #555;
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  padding: 0;
+  cursor: pointer;
+}
+.icon-btn:hover { background: #444; border-color: #0078d4; }
+.icon-btn:active { background: #222; }
+
+/* シークバーエリア */
+.seek-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1; /* 横幅いっぱいに広げる */
+  min-width: 200px;
+}
+
+input[type="range"]#audioSeekBar {
+  flex: 1;
+  height: 6px;
+  background: #333;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[type="range"]#audioSeekBar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  background: #ddd;
+  border-radius: 50%;
+  border: 2px solid #0078d4;
+  transition: transform 0.1s;
+}
+input[type="range"]#audioSeekBar:disabled {
+  opacity: 0.3; cursor: not-allowed;
+}
+
+/* 音量エリア */
+.vol-container {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.vol-container .icon { font-size: 14px; color: #aaa; }
+
+input[type="range"]#volumeSlider {
+  width: 60px;
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+input[type="range"]#volumeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px; height: 10px;
+  background: #aaa;
+  border-radius: 50%;
+}
+input[type="range"]#volumeSlider:hover::-webkit-slider-thumb { background: #fff; }
+
+/* 速度選択 */
+select#playbackRateSelect {
+  background: #222;
+  color: #ddd;
+  border: 1px solid #444;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  height: 24px;
+}
