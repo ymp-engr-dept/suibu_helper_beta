@@ -1,864 +1,621 @@
-const canvas = document.getElementById("analyzer");
-const ctx = canvas.getContext("2d");
-const gainInput = document.getElementById("gainInput");
-const freezeBtn = document.getElementById("freezeBtn");
-const recordBtn = document.getElementById("recordBtn");
-const fileInput = document.getElementById("fileInput");
-const audioPlayer = document.getElementById("audioPlayer");
-const a4Input = document.getElementById("a4Input");
-const showHarmonicsCheckbox = document.getElementById("showHarmonicsCheckbox");
-const saveCompareBtn = document.getElementById("saveCompareBtn");
-const showCompareCheckbox = document.getElementById("showCompareCheckbox");
-const sourceModeCheckbox = document.getElementById("sourceModeCheckbox");
-const audioSeekBar = document.getElementById("audioSeekBar");
-const currentTimeDisplay = document.getElementById("currentTimeDisplay");
-const durationDisplay = document.getElementById("durationDisplay");
-const playPauseBtn = document.getElementById("playPauseBtn");
-const volumeSlider = document.getElementById("volumeSlider");
-const playbackRateSelect = document.getElementById("playbackRateSelect");
+/**
+ * Professional Spectrum Analyzer Module
+ * SPA対応・クラスベース設計
+ */
+class SpectrumAnalyzer {
+  constructor(containerId) {
+    this.container = document.getElementById(containerId);
+    if (!this.container) throw new Error(`Container #${containerId} not found.`);
 
-// AI関連のDOM
-const chatHistory = document.getElementById("chatHistory");
-const chatInput = document.getElementById("chatInput");
-const sendChatBtn = document.getElementById("sendChatBtn");
-const sendDataCheckbox = document.getElementById("sendDataCheckbox");
+    // --- 設定値 & 定数 ---
+    this.MIN_FREQ = 20;
+    this.MAX_FREQ = 20000;
+    this.DISPLAY_MIN_DB = 0;
+    this.DISPLAY_MAX_DB = 80;
 
-// =======================================================
-//  OpenAI API 設定
-// =======================================================
-// 【重要】ここにOpenAIのAPIキーを入力してください
-// テスト時はここに直接書き込みますが、本番環境ではサーバーサイドで管理することを推奨します。
-const OPENAI_API_KEY = "OpenAI_API_KEYをここに入力";
+    // --- 状態管理 ---
+    this.audioContext = null;
+    this.analyser = null;
+    this.micSource = null;
+    this.playerSource = null;
+    this.mediaRecorder = null;
+    this.audioChunks = [];
+    this.animationId = null;
+    this.resizeObserver = null;
 
-// --- 状態管理変数 ---
-let selectedFreq = null;
-let isFrozen = false;
-let isRecording = false;
-
-// 現在保持している音声データ (Blob)
-let currentAudioBlob = null; 
-// 録音のMIME Type (OpenAIへ送る形式判定用)
-let recordedMimeType = "audio/wav";
-
-// AudioContext関連
-let audioContext = null;
-let analyser = null;
-let micSource = null;       
-let playerSource = null;    
-let mediaRecorder = null;   
-let audioChunks = [];       
-
-// 基本周波数を追跡するための変数を追加
-let detectedFundamentalFreq = null;
-
-// 比較用データを格納する変数
-let comparisonDataArray = null;
-
-// フラグ
-let isFileMode = false; // false=Mic, true=File
-let isScrubbing = false; // スライダー操作中かどうか
-
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = 350;
-}
-resize();
-window.onresize = resize;
-
-// --- 座標・周波数変換ロジック ---
-const minFreq = 20;
-const maxFreq = 20000;
-const displayMinDB = 0;
-const displayMaxDB = 80;
-
-function freqToX(freq) {
-  const logMin = Math.log10(minFreq);
-  const logMax = Math.log10(maxFreq);
-  const logF = Math.log10(freq);
-  return ((logF - logMin) / (logMax - logMin)) * canvas.width;
-}
-
-function xToFreq(x) {
-  const logMin = Math.log10(minFreq);
-  const logMax = Math.log10(maxFreq);
-  const ratio = x / canvas.width;
-  const logF = ratio * (logMax - logMin) + logMin;
-  return Math.pow(10, logF);
-}
-
-// --- 初期化 & オーディオセットアップ ---
-async function initAudio() {
-  if (audioContext) return; 
-
-  audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  
-  analyser = audioContext.createAnalyser();
-  analyser.fftSize = 2048;
-  analyser.smoothingTimeConstant = 0.6; 
-
-  // マイク入力セットアップ
-  let stream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch(e) {
-    console.warn("マイクが見つかりません:", e);
-  }
-  
-  if (stream) {
-    micSource = audioContext.createMediaStreamSource(stream);
+    this.isFrozen = false;
+    this.isRecording = false;
+    this.isFileMode = false;
+    this.isScrubbing = false;
+    this.selectedFreq = null;
     
-    // 録音機能 (既存コード維持)
+    // データ保持
+    this.dataArray = new Uint8Array(2048);
+    this.comparisonDataArray = null;
+    this.detectedFundamentalFreq = null;
+    this.recordedMimeType = "audio/webm";
+
+    // --- DOM要素のキャッシュ ---
+    this.bindDOMElements();
+  }
+
+  /**
+   * DOM要素を取得しプロパティに紐付け
+   */
+  bindDOMElements() {
+    const q = (sel) => this.container.querySelector(sel);
+    const canvasEl = q('#analyzerCanvas');
+    const ctx = canvasEl ? canvasEl.getContext('2d') : null;
+
+    this.els = {
+      canvas: canvasEl,
+      ctx: ctx,
+      gain: q('#gainInput'),
+      a4: q('#a4Input'),
+      showHarmonics: q('#showHarmonicsCheckbox'),
+      freezeBtn: q('#freezeBtn'),
+      saveCompareBtn: q('#saveCompareBtn'),
+      showCompare: q('#showCompareCheckbox'),
+      recordBtn: q('#recordBtn'),
+      fileInput: q('#fileInput'),
+      // Player related
+      audioEngine: q('#audioEngine'),
+      playerInterface: q('#playerInterface'),
+      sourceMode: q('#sourceModeCheckbox'),
+      playPauseBtn: q('#playPauseBtn'),
+      seekBar: q('#audioSeekBar'),
+      timeDisplay: q('#currentTimeDisplay'),
+      durationDisplay: q('#durationDisplay'),
+      volumeSlider: q('#volumeSlider'),
+      playbackRate: q('#playbackRateSelect'),
+      status: q('#statusIndicator'),
+    };
+
+    // 必須要素の検証（存在しない場合は早期に分かりやすいエラーを投げる）
+    const required = [
+      'canvas', 'ctx', 'audioEngine', 'sourceMode', 'recordBtn', 'status'
+    ];
+    const missing = required.filter(k => !this.els[k]);
+    if (missing.length) {
+      throw new Error(`Missing DOM element(s): ${missing.join(', ')}`);
+    }
+  }
+
+  /**
+   * SPAマウント時に呼び出す初期化メソッド
+   */
+  mount() {
+    this.setupEventListeners();
+    this.handleResize();
+    
+    // Canvasのリサイズ監視 (ウィンドウリサイズではなくコンテナリサイズに対応)
+    this.resizeObserver = new ResizeObserver(() => this.handleResize());
+    this.resizeObserver.observe(this.container);
+
+    // 初期描画ループ開始
+    this.draw();
+  }
+
+  /**
+   * SPAアンマウント時に呼び出すクリーンアップメソッド
+   */
+  dispose() {
+    if (this.animationId) cancelAnimationFrame(this.animationId);
+    if (this.resizeObserver) this.resizeObserver.disconnect();
+    if (this.audioContext) this.audioContext.close();
+    
+    // 録音中なら停止
+    if (this.isRecording && this.mediaRecorder) {
+      this.mediaRecorder.stop();
+    }
+  }
+
+  // =========================================
+  //  Audio System
+  // =========================================
+
+  async initAudio() {
+    if (this.audioContext) return;
+
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    this.audioContext = new AudioContext();
+
+    this.analyser = this.audioContext.createAnalyser();
+    this.analyser.fftSize = 2048;
+    this.analyser.smoothingTimeConstant = 0.6;
+
+    // マイク入力設定
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.micSource = this.audioContext.createMediaStreamSource(stream);
+      this.setupRecorder(stream);
+      this.els.status.textContent = "Mic Ready";
+    } catch (e) {
+      console.warn("マイクアクセス拒否または利用不可:", e);
+      this.els.status.textContent = "Mic Error";
+    }
+
+    // プレイヤー入力設定
+    this.playerSource = this.audioContext.createMediaElementSource(this.els.audioEngine);
+
+    // ルーティング適用
+    this.updateSourceRouting();
+  }
+
+  setupRecorder(stream) {
     let options = {};
     if (MediaRecorder.isTypeSupported('audio/webm')) {
       options = { mimeType: 'audio/webm' };
-      recordedMimeType = 'audio/webm';
+      this.recordedMimeType = 'audio/webm';
     } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
       options = { mimeType: 'audio/mp4' };
-      recordedMimeType = 'audio/mp4';
+      this.recordedMimeType = 'audio/mp4';
     }
 
-    mediaRecorder = new MediaRecorder(stream, options);
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) audioChunks.push(event.data);
+    this.mediaRecorder = new MediaRecorder(stream, options);
+    
+    this.mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) this.audioChunks.push(e.data);
     };
 
-    mediaRecorder.onstop = () => {
-      const audioBlob = new Blob(audioChunks, { type: recordedMimeType });
-      currentAudioBlob = audioBlob; 
-      const audioUrl = URL.createObjectURL(audioBlob);
-      audioPlayer.src = audioUrl;
-      audioChunks = [];
-      
-      // 録音完了したら自動でファイルモードに切り替えると親切
-      sourceModeCheckbox.checked = true;
-      updateSourceRouting();
+    this.mediaRecorder.onstop = () => {
+      const blob = new Blob(this.audioChunks, { type: this.recordedMimeType });
+      this.loadAudioBlob(blob);
+      this.audioChunks = [];
+      // 録音完了後は自動でファイルモードへ
+      this.els.sourceMode.checked = true;
+      this.updateSourceRouting();
     };
   }
 
-  // プレイヤーソース作成
-  playerSource = audioContext.createMediaElementSource(audioPlayer);
+  updateSourceRouting() {
+    if (!this.audioContext || !this.analyser) return;
 
-  // ▼▼▼ オーディオプレイヤーのイベント監視 (UI同期) ▼▼▼
-  
-  // 再生開始時
-  audioPlayer.addEventListener('play', () => {
-    if (audioContext.state === 'suspended') audioContext.resume();
-    playPauseBtn.textContent = "❚❚"; // 一時停止アイコン
-    if (sourceModeCheckbox.checked) updateSourceRouting();
-  });
+    // sourceMode は this.els 内の要素なので安全にアクセスする
+    this.isFileMode = !!(this.els.sourceMode && this.els.sourceMode.checked);
 
-  // 一時停止時
-  audioPlayer.addEventListener('pause', () => {
-    playPauseBtn.textContent = "▶"; // 再生アイコン
-    // pause時はルーティングを切る必要はない (スクラブ操作などのため接続維持推奨)
-  });
+    const playerInterface = this.els.playerInterface;
+    const audioEngine = this.els.audioEngine;
+    const { micSource, playerSource, analyser } = this;
+    const { playPauseBtn, seekBar, volumeSlider, playbackRate } = this.els;
 
-  // 再生終了時
-  audioPlayer.addEventListener('ended', () => {
-    playPauseBtn.textContent = "▶";
-  });
+    // UI制御
+    if (this.isFileMode) {
+      if (playerInterface && playerInterface.classList) playerInterface.classList.remove('disabled');
+      [playPauseBtn, seekBar, volumeSlider, playbackRate].forEach(el => { if (el) el.disabled = false; });
+    } else {
+      if (playerInterface && playerInterface.classList) playerInterface.classList.add('disabled');
+      [playPauseBtn, seekBar, volumeSlider, playbackRate].forEach(el => { if (el) el.disabled = true; });
+    }
 
-  // 初期ルーティング実行
-  updateSourceRouting();
-  draw();
-}
-
-function updateSourceRouting() {
-  if (!analyser) return;
-
-  isFileMode = sourceModeCheckbox.checked;
-
-  // ▼▼▼ 新しいUIパーツの有効/無効切り替え ▼▼▼
-  const uiElements = [audioSeekBar, playPauseBtn, volumeSlider, playbackRateSelect];
-  uiElements.forEach(el => el.disabled = !isFileMode);
-  
-  // モードOFFなら不透明度を下げて視覚的に無効化
-  document.querySelector('.player-controls-group').style.opacity = isFileMode ? "1" : "0.6";
-
-  if (isFileMode) {
-    // --- 音源モード ---
-    try { micSource.disconnect(); } catch(e){}
-    try { 
-      playerSource.connect(analyser);
-      analyser.connect(audioContext.destination); 
-    } catch(e){}
-  } else {
-    // --- マイクモード ---
-    try { playerSource.disconnect(); } catch(e){}
-    try { analyser.disconnect(audioContext.destination); } catch(e){}
-    try { micSource.connect(analyser); } catch(e){}
-  }
-}
-
-
-// --- UIイベントリスナー ---
-
-document.body.addEventListener('click', () => {
-  if (!audioContext) initAudio();
-}, { once: true });
-
-freezeBtn.addEventListener("click", () => {
-  isFrozen = !isFrozen;
-  freezeBtn.textContent = isFrozen ? "再開 (解除)" : "フリーズ";
-  freezeBtn.classList.toggle("active", isFrozen);
-});
-
-recordBtn.addEventListener("click", async () => {
-  if (!audioContext) await initAudio();
-  if (!mediaRecorder) return;
-
-  if (!isRecording) {
-    audioChunks = [];
-    mediaRecorder.start();
-    isRecording = true;
-    recordBtn.textContent = "■ 停止";
-    recordBtn.classList.add("recording");
-    audioPlayer.pause();
-  } else {
-    mediaRecorder.stop();
-    isRecording = false;
-    recordBtn.textContent = "● 録音";
-    recordBtn.classList.remove("recording");
-  }
-});
-
-fileInput.addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if (file) {
-    currentAudioBlob = file; 
-    recordedMimeType = file.type; // ファイルのMIMEタイプを保持
-    const url = URL.createObjectURL(file);
-    audioPlayer.src = url;
-  }
-});
-
-canvas.addEventListener("mousedown", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const freq = xToFreq(x);
-  if (freq >= minFreq && freq <= maxFreq) {
-    selectedFreq = freq;
-  }
-});
-
-// 比較グラフ保存ボタン
-saveCompareBtn.addEventListener("click", () => {
-  if (dataArray) {
-    // 現在のデータをディープコピーして保存 (参照渡しだとリアルタイムで変わってしまうため)
-    comparisonDataArray = new Uint8Array(dataArray);
-    
-    // 保存した瞬間、自動で「表示」をONにすると親切です
-    showCompareCheckbox.checked = true;
-    
-    // 保存完了の視覚フィードバック（ボタンを一瞬光らせるなど）
-    const originalText = saveCompareBtn.textContent;
-    saveCompareBtn.textContent = "保存完了!";
-    setTimeout(() => saveCompareBtn.textContent = originalText, 1000);
-  }
-});
-
-// モード切替スイッチ
-sourceModeCheckbox.addEventListener("change", () => {
-  if (!audioContext) initAudio();
-  updateSourceRouting();
-});
-
-// ファイル読み込み時
-fileInput.addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if (file) {
-    currentAudioBlob = file; 
-    recordedMimeType = file.type;
-    const url = URL.createObjectURL(file);
-    audioPlayer.src = url;
-    
-    // 自動でモードON
-    sourceModeCheckbox.checked = true;
-    updateSourceRouting();
-  }
-});
-
-// --- シークバー & タイム表示ロジック ---
-
-function formatTime(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-// メタデータ読み込み完了（長さ確定）
-audioPlayer.addEventListener('loadedmetadata', () => {
-  audioSeekBar.max = audioPlayer.duration;
-  durationDisplay.textContent = formatTime(audioPlayer.duration);
-});
-
-// 再生中のスライダー自動更新
-audioPlayer.addEventListener('timeupdate', () => {
-  if (!isScrubbing) {
-    audioSeekBar.value = audioPlayer.currentTime;
-    currentTimeDisplay.textContent = formatTime(audioPlayer.currentTime);
-  }
-});
-
-// スライダー操作開始 (ドラッグ中)
-audioSeekBar.addEventListener('mousedown', () => { isScrubbing = true; });
-audioSeekBar.addEventListener('touchstart', () => { isScrubbing = true; }, {passive: true});
-
-// スライダー操作中 (スクラブ)
-audioSeekBar.addEventListener('input', () => {
-  if (!audioContext) initAudio();
-  
-  const time = parseFloat(audioSeekBar.value);
-  audioPlayer.currentTime = time;
-  currentTimeDisplay.textContent = formatTime(time);
-  });
-
-audioSeekBar.addEventListener('mouseup', () => { isScrubbing = false; });
-audioSeekBar.addEventListener('touchend', () => { isScrubbing = false; });
-
-// 再生/一時停止ボタン
-playPauseBtn.addEventListener("click", () => {
-  if (!audioContext) initAudio();
-  
-  if (audioPlayer.paused) {
-    audioPlayer.play();
-  } else {
-    audioPlayer.pause();
-  }
-});
-
-// 音量スライダー
-volumeSlider.addEventListener("input", (e) => {
-  audioPlayer.volume = parseFloat(e.target.value);
-});
-
-// 再生速度選択
-playbackRateSelect.addEventListener("change", (e) => {
-  audioPlayer.playbackRate = parseFloat(e.target.value);
-});
-
-
-// --- シークバー関連 (既存コードの確認と微調整) ---
-
-// formatTime関数 (既存)
-function formatTime(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-// メタデータ読み込み時
-audioPlayer.addEventListener('loadedmetadata', () => {
-  audioSeekBar.max = audioPlayer.duration;
-  durationDisplay.textContent = formatTime(audioPlayer.duration);
-  // 初期状態UIリセット
-  playPauseBtn.textContent = "▶";
-});
-
-// 再生中の更新
-audioPlayer.addEventListener('timeupdate', () => {
-  if (!isScrubbing) {
-    audioSeekBar.value = audioPlayer.currentTime;
-    currentTimeDisplay.textContent = formatTime(audioPlayer.currentTime);
-  }
-});
-
-// スクラブ操作 (既存コード)
-audioSeekBar.addEventListener('mousedown', () => { isScrubbing = true; });
-audioSeekBar.addEventListener('touchstart', () => { isScrubbing = true; }, {passive: true});
-
-audioSeekBar.addEventListener('input', () => {
-  if (!audioContext) initAudio();
-  const time = parseFloat(audioSeekBar.value);
-  
-  // シーク位置を即時反映
-  audioPlayer.currentTime = time;
-  currentTimeDisplay.textContent = formatTime(time);
-});
-
-audioSeekBar.addEventListener('mouseup', () => { isScrubbing = false; });
-audioSeekBar.addEventListener('touchend', () => { isScrubbing = false; });
-
-// --- 描画ループ ---
-const dataArray = new Uint8Array(2048); 
-
-function drawGrid() {
-  ctx.strokeStyle = "rgba(255,255,255,0.25)";
-  ctx.lineWidth = 1;
-  const freqs = [20,30,50,100,200,300,500,1000,2000,3000,5000,8000,10000,20000];
-  ctx.font = "12px sans-serif";
-  ctx.fillStyle = "white";
-  ctx.textAlign = "center";
-  for (let f of freqs) {
-    const x = freqToX(f);
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-    ctx.fillText(f + "Hz", x, canvas.height - 5);
-  }
-  const dBLines = [0, 20, 40, 60, 80];
-  ctx.textAlign = "left";
-  dBLines.forEach(dB => {
-    const y = canvas.height * (1 - dB / displayMaxDB);
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-    ctx.fillText(dB + " dB", 5, y - 3);
-  });
-}
-
-function drawMarkerAndTooltip(freqPerBin) {
-  if (selectedFreq == null) return;
-
-  const bufferLength = analyser ? analyser.frequencyBinCount : (dataArray ? dataArray.length : 0);
-  if (!bufferLength) return;
-
-  const x = freqToX(selectedFreq);
-  let index = Math.round(selectedFreq / freqPerBin);
-  index = Math.max(0, Math.min(index, bufferLength - 1));
-
-  let value = 0;
-  if (index >= 0 && index < dataArray.length) {
-    value = dataArray[index] || 0;
+    // Audio Routing
+    if (this.isFileMode) {
+      // File Mode
+      try { if (micSource && micSource.disconnect) micSource.disconnect(); } catch(e){}
+      try {
+        if (playerSource && playerSource.connect) playerSource.connect(analyser);
+        if (analyser && analyser.connect) analyser.connect(this.audioContext.destination); // 鳴らす
+      } catch(e){}
+    } else {
+      // Mic Mode
+      try { if (playerSource && playerSource.disconnect) playerSource.disconnect(); } catch(e){}
+      try { if (analyser && analyser.disconnect) analyser.disconnect(this.audioContext.destination); } catch(e){}
+      try { if (micSource && micSource.connect) micSource.connect(analyser); } catch(e){}
+    }
   }
 
-  const gainVal = Number(gainInput.value) || 1;
-  let adjustedValue = value * gainVal;
-  const dbValue = (adjustedValue / 255) * displayMaxDB;
+  // =========================================
+  //  Event Handling
+  // =========================================
 
-  // 赤い縦線
-  ctx.beginPath();
-  ctx.strokeStyle = "rgba(255, 50, 50, 0.8)";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([5, 3]);
-  ctx.moveTo(x, 0);
-  ctx.lineTo(x, canvas.height);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  setupEventListeners() {
+    // Audio Context開始トリガー (ユーザー操作が必要)
+    this.container.addEventListener('click', () => this.initAudio(), { once: true });
 
-  // テキスト情報の構築
-  let noteName = "";
-  try {
-    noteName = typeof getNoteName === "function" ? getNoteName(selectedFreq) : "";
-  } catch (e) {}
+    // Tools
+    this.els.freezeBtn.addEventListener('click', () => {
+      this.isFrozen = !this.isFrozen;
+      this.els.freezeBtn.textContent = this.isFrozen ? "再開" : "フリーズ";
+      this.els.freezeBtn.style.background = this.isFrozen ? "#d32f2f" : "";
+    });
 
-  let textFreq = `${Math.round(selectedFreq)} Hz${noteName ? " (" + noteName + ")" : ""}`;
-  const textDB = `${dbValue.toFixed(1)} dB`;
-  
-  // ▼▼▼ 倍音・低次倍音 判定ロジック ▼▼▼
-  let harmonicText = "";
-  if (detectedFundamentalFreq && detectedFundamentalFreq > 0) {
-    // 1. 高次倍音 (Harmonics: f * n) 判定
-    if (selectedFreq >= detectedFundamentalFreq) {
-      const ratio = selectedFreq / detectedFundamentalFreq;
-      const harmonicN = Math.round(ratio);
-      // 誤差5%以内
-      if (Math.abs(ratio - harmonicN) < 0.05) {
-        harmonicText = harmonicN === 1 ? "★ 基本周波数" : `第${harmonicN}倍音`;
+    this.els.saveCompareBtn.addEventListener('click', () => {
+      if (this.dataArray) {
+        this.comparisonDataArray = new Uint8Array(this.dataArray);
+        this.els.showCompare.checked = true;
+        
+        const originalText = this.els.saveCompareBtn.textContent;
+        this.els.saveCompareBtn.textContent = "保存完了!";
+        setTimeout(() => this.els.saveCompareBtn.textContent = originalText, 1000);
       }
-    } 
-    // 2. 低次倍音 (Subharmonics: f / n) 判定
-    else {
-      // 逆比 (基本周波数 / 選択周波数) が整数に近いか
-      const ratioSub = detectedFundamentalFreq / selectedFreq;
-      const subN = Math.round(ratioSub);
-      
-      if (Math.abs(ratioSub - subN) < 0.05 && subN > 1) {
-        harmonicText = `1/${subN} 低次倍音`;
+    });
+
+    this.els.recordBtn.addEventListener('click', () => {
+      if (!this.audioContext) this.initAudio();
+      if (!this.mediaRecorder) return;
+
+      if (!this.isRecording) {
+        this.startRecording();
+      } else {
+        this.stopRecording();
       }
-    }
-  }
-  // ▲▲▲ 追加終了 ▲▲▲
+    });
 
-  // ボックスサイズ計算
-  ctx.font = "bold 13px sans-serif";
-  const textMetrics = ctx.measureText(textFreq);
-  const textMetricsH = ctx.measureText(harmonicText);
-  const boxWidth = Math.max(120, textMetrics.width + 20, textMetricsH.width + 20);
-  const boxHeight = harmonicText ? 70 : 50;
+    // File Input
+    this.els.fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        this.loadAudioBlob(file);
+        this.els.sourceMode.checked = true;
+        this.updateSourceRouting();
+      }
+    });
 
-  let boxX = x + 10;
-  let boxY = 20;
-  if (boxX + boxWidth > canvas.width) boxX = x - boxWidth - 10;
-  if (boxX < 0) boxX = 5;
+    // Mode Switch
+    this.els.sourceMode.addEventListener('change', () => {
+      if(!this.audioContext) this.initAudio();
+      this.updateSourceRouting();
+    });
 
-  // 吹き出し描画
-  ctx.fillStyle = "rgba(50, 0, 0, 0.9)";
-  ctx.strokeStyle = "red";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 5);
-  else ctx.rect(boxX, boxY, boxWidth, boxHeight);
-  ctx.fill();
-  ctx.stroke();
-
-  // 文字描画
-  ctx.fillStyle = "white";
-  ctx.textAlign = "left";
-  ctx.font = "bold 13px sans-serif";
-  ctx.fillText(textFreq, boxX + 10, boxY + 20);
-
-  ctx.fillStyle = dbValue > 60 ? "#ff5555" : "#aaa";
-  ctx.font = "12px monospace";
-  ctx.fillText(textDB, boxX + 10, boxY + 40);
-
-  if (harmonicText) {
-    // 低次倍音は色を変える（例：シアン系）、通常倍音はオレンジ
-    ctx.fillStyle = harmonicText.includes("低次") ? "#00ffff" : "#ffaa00";
-    ctx.font = "bold 12px sans-serif";
-    ctx.fillText(harmonicText, boxX + 10, boxY + 60);
-  }
-}
-
-function drawHarmonicsLines(f0) {
-  if (!f0 || f0 < minFreq) return;
-
-  ctx.lineWidth = 1.5;
-  
-  // --- 1. 基本周波数 (Base) ---
-  const x0 = freqToX(f0);
-  if (x0 >= 0 && x0 <= canvas.width) {
-    ctx.beginPath();
-    ctx.strokeStyle = "rgba(255,165,0,0.9)"; // 濃いオレンジ
-    ctx.setLineDash([]);
-    ctx.moveTo(x0, 0);
-    ctx.lineTo(x0, canvas.height);
-    ctx.stroke();
+    // Canvas Interaction
+    this.els.canvas.addEventListener('mousedown', (e) => {
+      const rect = this.els.canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      this.selectedFreq = this.xToFreq(x);
+    });
     
-    ctx.fillStyle = "rgba(255, 165, 0, 1)";
-    ctx.font = "10px sans-serif";
-    ctx.fillText("Base", x0 + 2, 10);
+    // Player Events
+    this.setupPlayerEvents();
   }
 
-  // --- 2. 高次倍音 (Overtones: x2, x3...) ---
-  ctx.strokeStyle = "rgba(255,255,0,0.5)"; // 黄色
-  ctx.fillStyle = "rgba(255,255,0,0.8)";
-  ctx.setLineDash([]); // 実線
+  setupPlayerEvents() {
+    const { audioEngine, playPauseBtn, seekBar, timeDisplay, durationDisplay, volumeSlider, playbackRate } = this.els;
 
-  for (let n = 2; n <= 16; n++) {
-    const fn = f0 * n;
-    if (fn > maxFreq) break; 
+    audioEngine.addEventListener('play', () => {
+      if (this.audioContext && this.audioContext.state === 'suspended') this.audioContext.resume();
+      playPauseBtn.textContent = "❚❚";
+    });
 
-    const xn = freqToX(fn);
-    if (xn >= 0 && xn <= canvas.width) {
-      ctx.beginPath();
-      ctx.moveTo(xn, 0);
-      ctx.lineTo(xn, canvas.height);
-      ctx.stroke();
-      if (n <= 8) ctx.fillText(`x${n}`, xn + 2, 10);
-    }
-  }
-
-  // --- 3. 低次倍音 (Subharmonics: 1/2, 1/3...) ---
-  // 追加機能: 基本周波数より低い成分の位置を示す
-  ctx.strokeStyle = "rgba(0, 255, 255, 0.4)"; // シアン（薄め）
-  ctx.fillStyle = "rgba(0, 255, 255, 0.7)";
-  ctx.setLineDash([2, 4]); // 点線にする
-
-  for (let n = 2; n <= 8; n++) {
-    const fn = f0 / n; // 割り算
-    if (fn < minFreq) break; // 最低周波数を下回ったら終了
-
-    const xn = freqToX(fn);
-    if (xn >= 0 && xn <= canvas.width) {
-      ctx.beginPath();
-      ctx.moveTo(xn, 0);
-      ctx.lineTo(xn, canvas.height);
-      ctx.stroke();
-      
-      // ラベル表示 (下部に表示して被りを避ける)
-      ctx.fillText(`1/${n}`, xn + 2, canvas.height - 20);
-    }
-  }
-  
-  ctx.setLineDash([]); // 設定を戻す
-}
-
-function draw() {
-  requestAnimationFrame(draw);
-  if (!analyser) return;
-
-  const freqPerBin = audioContext.sampleRate / analyser.fftSize;
-  const bufferLength = analyser.frequencyBinCount;
-
-  if (!isFrozen) {
-    analyser.getByteFrequencyData(dataArray);
-  }
-
-  // 背景クリア
-  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  grad.addColorStop(0, "#000");
-  grad.addColorStop(1, "#050505");
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  drawGrid();
-
-  // ▼▼▼ 比較グラフの描画 (メイングラフの「下層」に描くため先に呼ぶ) ▼▼▼
-  if (showCompareCheckbox.checked && comparisonDataArray) {
-    drawComparisonGraph(freqPerBin);
-  }
-  // ▲▲▲ 追加終了 ▲▲▲
-
-  // メイングラフ描画
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgb(0,180,255)";
-  const gainVal = Number(gainInput.value) || 1;
-
-  ctx.beginPath();
-  let started = false;
-
-  let maxVal = 0;
-  let maxBinIndex = -1;
-  const threshold = 50; 
-
-  for (let i = 0; i < bufferLength; i++) {
-    const freq = i * freqPerBin;
-    if (freq < minFreq || freq > maxFreq) continue;
+    audioEngine.addEventListener('pause', () => playPauseBtn.textContent = "▶");
+    audioEngine.addEventListener('ended', () => playPauseBtn.textContent = "▶");
     
-    const val = dataArray[i];
+    audioEngine.addEventListener('loadedmetadata', () => {
+      seekBar.max = audioEngine.duration;
+      durationDisplay.textContent = this.formatTime(audioEngine.duration);
+    });
 
-    if (val > maxVal) {
-      maxVal = val;
-      maxBinIndex = i;
-    }
+    audioEngine.addEventListener('timeupdate', () => {
+      if (!this.isScrubbing) {
+        seekBar.value = audioEngine.currentTime;
+        timeDisplay.textContent = this.formatTime(audioEngine.currentTime);
+      }
+    });
 
-    const x = freqToX(freq);
-    const y = canvas.height * (1 - (val / 255) * gainVal);
+    playPauseBtn.addEventListener('click', () => {
+      if(audioEngine.paused) audioEngine.play();
+      else audioEngine.pause();
+    });
 
-    if (!started) {
-      ctx.moveTo(x, y);
-      started = true;
-    } else {
-      ctx.lineTo(x, y);
-    }
+    volumeSlider.addEventListener('input', (e) => audioEngine.volume = parseFloat(e.target.value));
+    playbackRate.addEventListener('change', (e) => audioEngine.playbackRate = parseFloat(e.target.value));
+
+    // Scrubbing
+    const startScrub = () => { this.isScrubbing = true; };
+    const endScrub = () => { this.isScrubbing = false; };
+    const performScrub = () => {
+      if(!this.audioContext) this.initAudio();
+      audioEngine.currentTime = parseFloat(seekBar.value);
+      timeDisplay.textContent = this.formatTime(audioEngine.currentTime);
+    };
+
+    seekBar.addEventListener('mousedown', startScrub);
+    seekBar.addEventListener('touchstart', startScrub, {passive: true});
+    seekBar.addEventListener('input', performScrub);
+    seekBar.addEventListener('mouseup', endScrub);
+    seekBar.addEventListener('touchend', endScrub);
   }
-  ctx.stroke();
 
-  // 基本周波数の特定と更新
-  if (!isFrozen) {
-    if (maxVal > threshold && maxBinIndex !== -1) {
-      detectedFundamentalFreq = maxBinIndex * freqPerBin;
-    } else {
-      detectedFundamentalFreq = null; 
-    }
+  // =========================================
+  //  Logic Helpers
+  // =========================================
+
+  startRecording() {
+    this.audioChunks = [];
+    this.mediaRecorder.start();
+    this.isRecording = true;
+    this.els.recordBtn.textContent = "■ 停止";
+    this.els.recordBtn.classList.add("recording");
+    this.els.audioEngine.pause();
   }
 
-  // 倍音・低次倍音ラインの描画
-  if (showHarmonicsCheckbox.checked && detectedFundamentalFreq) {
-    drawHarmonicsLines(detectedFundamentalFreq);
+  stopRecording() {
+    this.mediaRecorder.stop();
+    this.isRecording = false;
+    this.els.recordBtn.textContent = "● 録音";
+    this.els.recordBtn.classList.remove("recording");
   }
 
-  // マウスカーソルとツールチップ
-  drawMarkerAndTooltip(freqPerBin);
-}
+  loadAudioBlob(blob) {
+    const url = URL.createObjectURL(blob);
+    this.els.audioEngine.src = url;
+  }
 
-function drawComparisonGraph(freqPerBin) {
-  if (!comparisonDataArray) return;
+  formatTime(seconds) {
+    if(!seconds) return "0:00";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
 
-  const gainVal = Number(gainInput.value) || 1;
-  const bufferLength = comparisonDataArray.length;
+  handleResize() {
+    this.els.canvas.width = this.els.canvas.clientWidth;
+    this.els.canvas.height = this.els.canvas.clientHeight;
+  }
 
-  ctx.lineWidth = 2;
-  // 半透明の白/グレーで描画
-  ctx.strokeStyle = "rgba(150, 150, 150, 0.5)"; 
-  // 塗りつぶしも追加して視認性を上げる
-  ctx.fillStyle = "rgba(150, 150, 150, 0.15)"; 
+  freqToX(freq) {
+    const logMin = Math.log10(this.MIN_FREQ);
+    const logMax = Math.log10(this.MAX_FREQ);
+    const logF = Math.log10(freq);
+    return ((logF - logMin) / (logMax - logMin)) * this.els.canvas.width;
+  }
 
-  ctx.beginPath();
-  ctx.moveTo(0, canvas.height); // 左下から開始
+  xToFreq(x) {
+    const logMin = Math.log10(this.MIN_FREQ);
+    const logMax = Math.log10(this.MAX_FREQ);
+    const ratio = x / this.els.canvas.width;
+    const logF = ratio * (logMax - logMin) + logMin;
+    return Math.pow(10, logF);
+  }
 
-  let started = false;
-  
-  for (let i = 0; i < bufferLength; i++) {
-    const freq = i * freqPerBin;
-    if (freq < minFreq || freq > maxFreq) continue;
+  getNoteName(freq) {
+    if (!freq || freq <= 0) return "--";
+    const a4 = Number(this.els.a4.value) || 442;
+    const noteStrings = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const semitonesFromA4 = 12 * Math.log2(freq / a4);
+    const midiNum = Math.round(semitonesFromA4) + 69;
+    if (midiNum < 0) return "?"; 
+    return `${noteStrings[midiNum % 12]}${Math.floor(midiNum / 12) - 1}`;
+  }
+
+  // =========================================
+  //  Drawing Engine
+  // =========================================
+
+  draw() {
+    this.animationId = requestAnimationFrame(() => this.draw());
     
-    const val = comparisonDataArray[i];
-    const x = freqToX(freq);
-    const y = canvas.height * (1 - (val / 255) * gainVal);
-
-    if (!started) {
-      ctx.lineTo(x, y); // 最初の点
-      started = true;
-    } else {
-      ctx.lineTo(x, y);
-    }
-  }
-  
-  // 右下まで線を引いて閉じる（塗りつぶし用）
-  ctx.lineTo(canvas.width, canvas.height);
-  ctx.closePath();
-  
-  ctx.fill();   // 薄く塗りつぶし
-  ctx.stroke(); // 輪郭線
-}
-
-function getNoteName(freq) {
-  if (!freq || freq <= 0) return "--";
-  const a4 = Number(a4Input.value) || 442;
-  const noteStrings = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-  const semitonesFromA4 = 12 * Math.log2(freq / a4);
-  const midiNum = Math.round(semitonesFromA4) + 69;
-  if (midiNum < 0) return "?"; 
-  return `${noteStrings[midiNum % 12]}${Math.floor(midiNum / 12) - 1}`;
-}
-
-
-// =======================================================
-//  AI分析 & チャット機能 (OpenAI API Integration)
-// =======================================================
-
-sendChatBtn.addEventListener("click", sendMessage);
-
-async function sendMessage() {
-  const text = chatInput.value.trim();
-  if (!text) return;
-
-  appendMessage("user", text);
-  chatInput.value = "";
-  
-  const loadingId = appendMessage("ai", "OpenAI分析中... (少々お待ちください)");
-
-  try {
-    let audioDataBase64 = null;
-    let analysisJson = null;
-
-    if (sendDataCheckbox.checked) {
-      if (!currentAudioBlob) {
-        updateMessage(loadingId, "エラー: 送信する音声データがありません。");
+    if (!this.analyser) {
+        // Analyser未初期化時はグリッドだけ描画
+        this.clearCanvas();
+        this.drawGrid();
         return;
-      }
-
-      // 1. 音声ファイルをBase64変換
-      audioDataBase64 = await blobToBase64(currentAudioBlob);
-
-      // 2. 音声ファイルを解析してJSONデータを生成 (簡易メタデータ)
-      updateMessage(loadingId, "音声と解析データをパッケージング中...");
-      analysisJson = await generateSpectralJSON(currentAudioBlob);
     }
 
-    // OpenAI APIへ送信
-    updateMessage(loadingId, "AI(GPT-4o Audio)に問い合わせ中...");
-    const aiResponse = await callOpenAIAPI(text, audioDataBase64, analysisJson);
+    const freqPerBin = this.audioContext.sampleRate / this.analyser.fftSize;
+    const bufferLength = this.analyser.frequencyBinCount;
 
-    // AIの返答を表示 (Markdownレンダリング)
-    updateMessage(loadingId, marked.parse(aiResponse));
+    if (!this.isFrozen) {
+      this.analyser.getByteFrequencyData(this.dataArray);
+    }
 
-  } catch (err) {
-    console.error(err);
-    updateMessage(loadingId, `エラーが発生しました: ${err.message}`);
-  }
-}
+    this.clearCanvas();
+    this.drawGrid();
 
-function appendMessage(role, htmlContent) {
-  const div = document.createElement("div");
-  div.className = `chat-message ${role}`;
-  div.innerHTML = `<div class="message-content">${htmlContent}</div>`;
-  chatHistory.appendChild(div);
-  chatHistory.scrollTop = chatHistory.scrollHeight;
-  return div.id = "msg_" + Date.now();
-}
+    // 比較グラフ
+    if (this.els.showCompare.checked && this.comparisonDataArray) {
+      this.drawComparisonGraph(freqPerBin);
+    }
 
-function updateMessage(id, newHtmlContent) {
-  const div = document.getElementById(id);
-  if (div) {
-    div.querySelector(".message-content").innerHTML = newHtmlContent;
-    chatHistory.scrollTop = chatHistory.scrollHeight;
-  }
-}
+    // メイン波形
+    const gainVal = Number(this.els.gain.value) || 1;
+    this.els.ctx.lineWidth = 2;
+    this.els.ctx.strokeStyle = "rgb(0,180,255)";
+    this.els.ctx.beginPath();
 
-function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result.split(',')[1];
-      resolve(base64String);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
+    let maxVal = 0;
+    let maxBinIndex = -1;
+    let started = false;
 
-// --- OpenAI API呼び出し関数 ---
-async function callOpenAIAPI(prompt, audioBase64, jsonData) {
-  if (!OPENAI_API_KEY || OPENAI_API_KEY.includes("YOUR_OPENAI_API_KEY")) {
-    throw new Error("OpenAI APIキーが設定されていません。script.jsのOPENAI_API_KEYを編集してください。");
-  }
-
-  const url = "https://api.openai.com/v1/chat/completions";
-  
-  // メッセージの構築
-  const content = [];
-  
-  // 1. テキストプロンプト + JSONデータ
-  let textContent = prompt;
-  if (jsonData) {
-    textContent += `\n\n【補足データ: 周波数解析メタデータ】\n${JSON.stringify(jsonData)}`;
-  }
-  content.push({ type: "text", text: textContent });
-
-  // 2. 音声データ (ある場合)
-  // GPT-4o-audio-preview は "wav" または "mp3" を好む
-  // ブラウザ録音が "webm" の場合でも "wav" として送ると通る場合があるが、
-  // エラーになる場合は変換が必要。ここでは簡易的に wav 指定で送る。
-  if (audioBase64) {
-    content.push({
-      type: "input_audio",
-      input_audio: {
-        data: audioBase64,
-        format: "wav" // OpenAI APIのformatは wav または mp3
+    for (let i = 0; i < bufferLength; i++) {
+      const freq = i * freqPerBin;
+      if (freq < this.MIN_FREQ || freq > this.MAX_FREQ) continue;
+      
+      const val = this.dataArray[i];
+      if (val > maxVal) {
+        maxVal = val;
+        maxBinIndex = i;
       }
+
+      const x = this.freqToX(freq);
+      const y = this.els.canvas.height * (1 - (val / 255) * gainVal);
+
+      if (!started) {
+        this.els.ctx.moveTo(x, y);
+        started = true;
+      } else {
+        this.els.ctx.lineTo(x, y);
+      }
+    }
+    this.els.ctx.stroke();
+
+    // 基本周波数検出
+    if (!this.isFrozen) {
+      if (maxVal > 50 && maxBinIndex !== -1) {
+        this.detectedFundamentalFreq = maxBinIndex * freqPerBin;
+      } else {
+        this.detectedFundamentalFreq = null;
+      }
+    }
+
+    // 倍音描画
+    if (this.els.showHarmonics.checked && this.detectedFundamentalFreq) {
+      this.drawHarmonicsLines(this.detectedFundamentalFreq);
+    }
+
+    // マーカーとツールチップ
+    this.drawMarkerAndTooltip(freqPerBin);
+  }
+
+  clearCanvas() {
+    const { ctx, canvas } = this.els;
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    grad.addColorStop(0, "#000");
+    grad.addColorStop(1, "#050505");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  drawGrid() {
+    const ctx = this.els.ctx;
+    ctx.strokeStyle = "rgba(255,255,255,0.15)";
+    ctx.lineWidth = 1;
+    ctx.font = "10px sans-serif";
+    ctx.fillStyle = "#888";
+    
+    // 周波数目盛り
+    const freqs = [20,50,100,200,500,1000,2000,5000,10000,20000];
+    ctx.textAlign = "center";
+    for (let f of freqs) {
+      const x = this.freqToX(f);
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, this.els.canvas.height); ctx.stroke();
+      ctx.fillText(f >= 1000 ? (f/1000)+"k" : f, x, this.els.canvas.height - 5);
+    }
+
+    // dB目盛り
+    const dBLines = [0, 20, 40, 60, 80];
+    ctx.textAlign = "left";
+    dBLines.forEach(dB => {
+      const y = this.els.canvas.height * (1 - dB / this.DISPLAY_MAX_DB);
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(this.els.canvas.width, y); ctx.stroke();
+      ctx.fillText(dB + "dB", 5, y - 3);
     });
   }
 
-  const payload = {
-    model: "gpt-4o-audio-preview", // 音声入力対応モデル
-    modalities: ["text"],          // 返答はテキストのみで受け取る
-    messages: [
-      {
-        role: "system",
-        content: "あなたは世界一のサックス演奏家・音響解析者です。提供された音声とデータを分析し、プロの視点で演奏のアドバイスを行ってください。"
-      },
-      {
-        role: "user",
-        content: content
+  drawComparisonGraph(freqPerBin) {
+    if (!this.comparisonDataArray) return;
+    const { ctx, canvas, gain } = this.els;
+    const gainVal = Number(gain.value) || 1;
+    
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(150, 150, 150, 0.4)"; 
+    ctx.fillStyle = "rgba(150, 150, 150, 0.1)"; 
+
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height);
+
+    let started = false;
+    for (let i = 0; i < this.comparisonDataArray.length; i++) {
+      const freq = i * freqPerBin;
+      if (freq < this.MIN_FREQ || freq > this.MAX_FREQ) continue;
+      
+      const val = this.comparisonDataArray[i];
+      const x = this.freqToX(freq);
+      const y = canvas.height * (1 - (val / 255) * gainVal);
+
+      if (!started) {
+        ctx.lineTo(x, y);
+        started = true;
+      } else {
+        ctx.lineTo(x, y);
       }
-    ]
-  };
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${OPENAI_API_KEY}`
-    },
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    const errData = await response.json();
-    console.error("OpenAI Error:", errData);
-    throw new Error(errData.error?.message || "API Request Failed");
+    }
+    ctx.lineTo(canvas.width, canvas.height);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
   }
 
-  const data = await response.json();
-  // 構造: choices[0].message.content (textの場合)
-  return data.choices[0].message.content;
-}
+  drawHarmonicsLines(f0) {
+    if (!f0 || f0 < this.MIN_FREQ) return;
+    const ctx = this.els.ctx;
+    
+    // Base
+    const x0 = this.freqToX(f0);
+    if (x0 >= 0) {
+      ctx.beginPath(); ctx.strokeStyle = "rgba(255,165,0,0.8)"; 
+      ctx.setLineDash([]); ctx.moveTo(x0, 0); ctx.lineTo(x0, this.els.canvas.height); ctx.stroke();
+      ctx.fillStyle = "orange"; ctx.fillText("Base", x0 + 2, 10);
+    }
 
-// --- 音声ファイル解析 (メタデータ生成) ---
-async function generateSpectralJSON(blob) {
-  const arrayBuffer = await blob.arrayBuffer();
-  
-  // 解析用に一時的なContext
-  const tempCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const audioBuffer = await tempCtx.decodeAudioData(arrayBuffer);
-  
-  // 詳細なJSON化は重いため、AIへのヒントとなるメタデータを返す
-  // GPT-4oは音声を直接聴けるため、これで十分強力です
-  const metaData = {
-    duration: audioBuffer.duration,
-    sampleRate: audioBuffer.sampleRate,
-    numberOfChannels: audioBuffer.numberOfChannels,
-    info: "Audio data is attached directly for analysis."
-  };
+    // Overtones
+    ctx.strokeStyle = "rgba(255,255,0,0.4)"; ctx.fillStyle = "rgba(255,255,0,0.7)";
+    for (let n = 2; n <= 16; n++) {
+      const fn = f0 * n;
+      if (fn > this.MAX_FREQ) break;
+      const xn = this.freqToX(fn);
+      if (xn >= 0) {
+        ctx.beginPath(); ctx.moveTo(xn, 0); ctx.lineTo(xn, this.els.canvas.height); ctx.stroke();
+        if (n <= 8) ctx.fillText(`x${n}`, xn + 2, 10);
+      }
+    }
 
-  return metaData; 
+    // Subharmonics
+    ctx.strokeStyle = "rgba(0,255,255,0.4)"; ctx.fillStyle = "rgba(0,255,255,0.7)"; ctx.setLineDash([2, 4]);
+    for (let n = 2; n <= 4; n++) {
+      const fn = f0 / n;
+      if (fn < this.MIN_FREQ) break;
+      const xn = this.freqToX(fn);
+      if (xn >= 0) {
+        ctx.beginPath(); ctx.moveTo(xn, 0); ctx.lineTo(xn, this.els.canvas.height); ctx.stroke();
+        ctx.fillText(`1/${n}`, xn + 2, this.els.canvas.height - 20);
+      }
+    }
+    ctx.setLineDash([]);
+  }
+
+  drawMarkerAndTooltip(freqPerBin) {
+    if (this.selectedFreq == null) return;
+    const ctx = this.els.ctx;
+    const x = this.freqToX(this.selectedFreq);
+    
+    // Index計算
+    let index = Math.round(this.selectedFreq / freqPerBin);
+    let value = 0;
+    if (index >= 0 && index < this.dataArray.length) value = this.dataArray[index];
+    
+    const dbValue = ((value * (Number(this.els.gain.value)||1)) / 255) * this.DISPLAY_MAX_DB;
+
+    // 赤ライン
+    ctx.beginPath(); ctx.strokeStyle = "rgba(255, 50, 50, 0.8)"; ctx.lineWidth = 1;
+    ctx.setLineDash([4, 2]); ctx.moveTo(x, 0); ctx.lineTo(x, this.els.canvas.height); ctx.stroke(); ctx.setLineDash([]);
+
+    // テキスト構成
+    const noteName = this.getNoteName(this.selectedFreq);
+    const textFreq = `${Math.round(this.selectedFreq)}Hz (${noteName})`;
+    const textDB = `${dbValue.toFixed(1)} dB`;
+    
+    // 倍音判定
+    let harmonicText = "";
+    if (this.detectedFundamentalFreq) {
+      const f0 = this.detectedFundamentalFreq;
+      if (this.selectedFreq >= f0) {
+        const ratio = this.selectedFreq / f0;
+        const n = Math.round(ratio);
+        if (Math.abs(ratio - n) < 0.05) harmonicText = n === 1 ? "★ 基本周波数" : `倍音: x${n}`;
+      } else {
+        const ratio = f0 / this.selectedFreq;
+        const n = Math.round(ratio);
+        if (Math.abs(ratio - n) < 0.05 && n > 1) harmonicText = `倍音: 1/${n}`;
+      }
+    }
+
+    // ツールチップ
+    ctx.font = "bold 12px sans-serif";
+    const w = Math.max(110, ctx.measureText(textFreq).width + 20);
+    const h = harmonicText ? 60 : 45;
+    let bx = x + 10;
+    if (bx + w > this.els.canvas.width) bx = x - w - 10;
+    
+    ctx.fillStyle = "rgba(20, 20, 20, 0.9)"; ctx.strokeStyle = "#444";
+    ctx.beginPath(); ctx.roundRect(bx, 20, w, h, 4); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = "#fff"; ctx.textAlign = "left";
+    ctx.fillText(textFreq, bx + 10, 38);
+    ctx.fillStyle = "#aaa"; ctx.font = "11px monospace";
+    ctx.fillText(textDB, bx + 10, 52);
+    if (harmonicText) {
+      ctx.fillStyle = harmonicText.includes("Sub") ? "cyan" : "orange";
+      ctx.fillText(harmonicText, bx + 10, 70);
+    }
+  }
 }
