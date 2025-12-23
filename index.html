@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suiren Audio Suite</title>
+  <style>
+    :root {
+      --sidebar-width: 240px;
+      --header-height: 60px;
+      --bg-dark: #050505;
+      --bg-panel: #111;
+      --accent: #00bcd4;
+      --text-main: #eee;
+      --text-sub: #888;
+    }
+
+    body {
+      margin: 0;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* --- Header --- */
+    header {
+      height: var(--header-height);
+      background-color: var(--bg-panel);
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      justify-content: space-between;
+      z-index: 100;
+    }
+
+    .brand {
+      font-size: 1.2rem;
+      font-weight: bold;
+      letter-spacing: 2px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* --- Main Layout --- */
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Sidebar Navigation */
+    .sidebar {
+      width: var(--sidebar-width);
+      background-color: #0a0a0a;
+      border-right: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      padding-top: 20px;
+      transition: transform 0.3s ease;
+    }
+
+    .nav-item {
+      padding: 15px 25px;
+      cursor: pointer;
+      color: var(--text-sub);
+      transition: all 0.2s;
+      border-left: 3px solid transparent;
+      font-size: 0.95rem;
+    }
+
+    .nav-item:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+    }
+
+    .nav-item.active {
+      background-color: rgba(0, 188, 212, 0.1);
+      color: var(--accent);
+      border-left-color: var(--accent);
+    }
+
+    /* Main Content Area */
+    .main-view {
+      flex: 1;
+      position: relative;
+      overflow: auto; /* 常にスクロール可能にする */
+      -webkit-overflow-scrolling: touch;
+      background: #000;
+    }
+
+    /* Loading Spinner */
+    .loader {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      border: 3px solid #333;
+      border-top: 3px solid var(--accent);
+      border-radius: 50%;
+      width: 40px; height: 40px;
+      animation: spin 1s linear infinite;
+      display: none;
+    }
+    @keyframes spin { 0% { transform: translate(-50%, -50%) rotate(0deg); } 100% { transform: translate(-50%, -50%) rotate(360deg); } }
+
+    /* Mobile Responsive */
+    .menu-toggle { display: none; background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        position: absolute;
+        height: 100%;
+        transform: translateX(-100%);
+        z-index: 50;
+      }
+      .sidebar.open { transform: translateX(0); }
+      .menu-toggle { display: block; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <button class="menu-toggle" id="menuToggle">☰</button>
+      SUIREN AUDIO LAB
+    </div>
+    <div style="font-size: 0.8rem; color: #666;">v1.0.0</div>
+  </header>
+
+  <div class="app-body">
+    <nav class="sidebar" id="sidebar">
+      <div class="nav-item active" data-module="SpectrumAnalyzer" data-class="SpectrumAnalyzer" data-container="spectrum-analyzer-app">
+        Spectrum Analyzer
+      </div>
+      <div class="nav-item" data-module="Tuner" data-class="TunerModule" data-container="tuner-app">
+        Precision Tuner
+      </div>
+    </nav>
+
+    <main class="main-view" id="mainView">
+      <div class="loader" id="loader"></div>
+      </main>
+  </div>
+
+  <script>
+    /**
+     * SPA Module Loader
+     * 各モジュールのHTML/CSS/JSを動的に読み込み、クラスをインスタンス化してマウントする
+     */
+    class AppController {
+      constructor() {
+        this.currentModuleInstance = null;
+        this.mainView = document.getElementById('mainView');
+        this.loader = document.getElementById('loader');
+        this.navItems = document.querySelectorAll('.nav-item');
+        this.loadedScripts = new Set(); // 二重ロード防止用
+        
+        this.init();
+      }
+
+      init() {
+        // ナビゲーションイベント
+        this.navItems.forEach(item => {
+          item.addEventListener('click', () => {
+            this.switchModule(item);
+            // モバイル用：選択したらメニューを閉じる
+            if (window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
+          });
+        });
+
+        // モバイルメニュー開閉
+        document.getElementById('menuToggle').addEventListener('click', () => {
+          document.getElementById('sidebar').classList.toggle('open');
+        });
+
+        // 初期ロード (最初のメニュー)
+        this.switchModule(this.navItems[0]);
+      }
+
+      async switchModule(targetNavItem) {
+        // UI更新
+        this.navItems.forEach(i => i.classList.remove('active'));
+        targetNavItem.classList.add('active');
+
+        // メタデータ取得
+        const moduleName = targetNavItem.dataset.module;
+        const className = targetNavItem.dataset.class;
+        const containerId = targetNavItem.dataset.container;
+
+        // クリーンアップ
+        if (this.currentModuleInstance && typeof this.currentModuleInstance.dispose === 'function') {
+          console.log('Disposing current module...');
+          this.currentModuleInstance.dispose();
+        }
+        this.currentModuleInstance = null;
+        this.mainView.innerHTML = ''; // ビューをクリア
+        this.mainView.appendChild(this.loader); // ローダー再配置
+        this.loader.style.display = 'block';
+
+        try {
+          const basePath = `./module/${moduleName}`;
+
+          // 1. CSSロード
+          this.loadCSS(`${basePath}/style.css`);
+
+          // 2. HTMLロード & 抽出
+          const htmlResponse = await fetch(`${basePath}/index.html`);
+          const htmlText = await htmlResponse.text();
+          const doc = new DOMParser().parseFromString(htmlText, 'text/html');
+          
+          // モジュールのコンテナIDを持つ要素を探す、なければbodyの中身
+          let moduleContent = doc.getElementById(containerId);
+          if (!moduleContent) {
+            // IDが見つからない場合はbody直下の要素を探す（フォールバック）
+            moduleContent = doc.body; 
+          }
+
+          // HTMLを挿入 (ローダーは消える)
+          this.loader.style.display = 'none';
+          
+          // コンテナごと挿入するか、中身だけ挿入するか
+          // 今回のモジュール設計ではコンテナIDが必要なので、HTML全体を解析して適切な形にする
+          if (moduleContent.tagName === 'BODY') {
+             this.mainView.innerHTML = moduleContent.innerHTML;
+          } else {
+             this.mainView.appendChild(moduleContent);
+          }
+
+          // 3. JSロード & クラス実行
+          await this.loadScript(`${basePath}/script.js`);
+
+          // クラスがグローバルにあるか確認してインスタンス化
+          if (window[className]) {
+            console.log(`Mounting ${className}...`);
+            this.currentModuleInstance = new window[className](containerId);
+            
+            // マウント実行
+            if (typeof this.currentModuleInstance.mount === 'function') {
+              this.currentModuleInstance.mount();
+            }
+            
+            // 初回クリック時のAudioContext再開対応 (ブラウザポリシー対策)
+            // モジュール側が initAudio() を持っていれば、画面クリックで開始するように促すなどの処理が可能
+            
+          } else {
+            console.error(`Class ${className} not found in window object.`);
+          }
+
+        } catch (e) {
+          console.error('Module Load Error:', e);
+          this.mainView.innerHTML = `<div style="color:red; padding:20px;">Error loading module: ${e.message}</div>`;
+        }
+      }
+
+      loadCSS(href) {
+        if (!document.querySelector(`link[href="${href}"]`)) {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = href;
+          document.head.appendChild(link);
+        }
+      }
+
+      loadScript(src) {
+        return new Promise((resolve, reject) => {
+          // すでにロード済みなら即解決
+          if (this.loadedScripts.has(src)) {
+            resolve();
+            return;
+          }
+
+          const script = document.createElement('script');
+          script.src = src;
+          script.onload = () => {
+            this.loadedScripts.add(src);
+            resolve();
+          };
+          script.onerror = reject;
+          document.body.appendChild(script);
+        });
+      }
+    }
+
+    // アプリ起動
+    document.addEventListener('DOMContentLoaded', () => {
+      new AppController();
+    });
+  </script>
+</body>
+</html>
