@@ -44,10 +44,10 @@ class TunerModule {
     
     this.algoHistory = { yin: [], mpm: [], fft: [], perc: [] };
     this.visualSwayState = {
-      yin: { x: 0, w: 0 },
-      mpm: { x: 0, w: 0 },
-      fft: { x: 0, w: 0 },
-      perc: { x: 0, w: 0 }
+      yin: { min: 0, max: 0 },
+      mpm: { min: 0, max: 0 },
+      fft: { min: 0, max: 0 },
+      perc: { min: 0, max: 0 }
     };
 
     // --- Constants ---
@@ -193,7 +193,7 @@ class TunerModule {
     this.analyser.getFloatTimeDomainData(this.timeBuf);
     this.analyser.getByteFrequencyData(this.freqBuf);
 
-    // RMS Gate (Configurable)
+    // RMS Gate
     const rms = this.calculateRMS(this.timeBuf);
     if (rms < this.config.minRMS) {
       this.resetState();
@@ -211,18 +211,31 @@ class TunerModule {
     this.perceivedFreq = percRes.freq;
     this.rawAlgoFreqs = { yin: yinRes.freq, mpm: mpmRes.freq, fft: fftRes.freq };
 
-    this.updateSwayHistory('yin', yinRes.freq);
-    this.updateSwayHistory('mpm', mpmRes.freq);
-    this.updateSwayHistory('fft', fftRes.freq);
-    this.updateSwayHistory('perc', percRes.freq);
-
     const finalRes = this.combineAlgorithmsAdaptive(yinRes, mpmRes, fftRes);
     const stableRes = this.adaptiveStabilizer(finalRes, fftRes.prob);
 
     if (stableRes && stableRes.freq > 0) {
+      // --- 追加・変更箇所: 音程変化時の履歴リセット処理 ---
+      // 前回の安定値と比べて半音以上（100セント以上）変わったら履歴を消す
+      // これにより、帯が「ビヨーン」と伸びるのを防ぎます
+      if (this.currentStableFreq > 0) {
+        const diffRatio = stableRes.freq / this.currentStableFreq;
+        // 半音(約1.059)以上の変化かチェック
+        if (diffRatio > 1.06 || diffRatio < 0.94) {
+           this.resetSwayHistory();
+        }
+      }
+      // ------------------------------------------------
+
       this.currentStableFreq = stableRes.freq;
       this.updateUpperUI(stableRes.freq);
     }
+
+    // Update History (リセット判定の後に行う)
+    this.updateSwayHistory('yin', yinRes.freq);
+    this.updateSwayHistory('mpm', mpmRes.freq);
+    this.updateSwayHistory('fft', fftRes.freq);
+    this.updateSwayHistory('perc', percRes.freq);
 
     this.draw();
   }
@@ -327,31 +340,66 @@ class TunerModule {
     const stats = this.getSwayStats(key, centerFreq);
     const state = this.visualSwayState[key]; 
 
-    const targetXOffset = stats.diff * pxPerCent; 
-    const targetWidthPx = stats.width * pxPerCent;
+    // px単位のターゲット値 (中心からの相対距離)
+    const targetMinPx = stats.min * pxPerCent;
+    const targetMaxPx = stats.max * pxPerCent;
 
-    state.x += (targetXOffset - state.x) * 0.15;
-    state.w += (targetWidthPx - state.w) * 0.08; 
+    // 滑らかな補間 (Lerp)
+    // 0.2 程度で素早く、かつ滑らかに追従させます
+    state.min += (targetMinPx - state.min) * 0.2;
+    state.max += (targetMaxPx - state.max) * 0.2;
 
-    const drawX = (this.els.canvas.width / 2) + state.x;
+    // 画面中央のX座標
+    const cx = this.els.canvas.width / 2;
+
+    // 現在の計算値 (白線の位置)
+    // minとmaxの中間ではなく、最新の値を描画したい場合は rawAlgoFreqs を使いますが
+    // ここでは帯の中心付近に線を表示するロジックとします
+    // もし「最新の値」を白線にしたい場合は別途計算が必要ですが、
+    // 帯の中に最新値があることは保証されているので、帯の重心または最新値を使います。
+    // 今回は「最新値」に白線を引く形にします。
     
-    if (drawX < -50 || drawX > this.els.canvas.width + 50) return;
-
-    if (state.w > 2) { 
-      this.ctx.fillStyle = "rgba(150, 150, 150, 0.25)";
-      this.ctx.fillRect(drawX - state.w/2, y, state.w, h);
+    // 最新値の計算
+    let currentFreq = (key === 'perc') ? this.perceivedFreq : this.rawAlgoFreqs[key];
+    let currentDiffCents = 0;
+    if (currentFreq > 0) {
+      currentDiffCents = 1200 * Math.log2(currentFreq / centerFreq);
+      // 外れ値キャップ
+      if(Math.abs(currentDiffCents) > 100) currentDiffCents = 0; 
     }
+    const currentPx = currentDiffCents * pxPerCent;
+
+
+    // --- 描画 ---
+    
+    // 1. 揺れ幅の帯 (Gray Band)
+    // cx + state.min から cx + state.max までを描画
+    const bandX = cx + state.min;
+    const bandW = state.max - state.min;
+
+    if (bandW > 1) { 
+      this.ctx.fillStyle = "rgba(150, 150, 150, 0.25)";
+      this.ctx.fillRect(bandX, y, bandW, h);
+    }
+
+    // 2. 現在値の白線 (White Line)
+    // 帯の中に収まるように描画
+    const lineX = cx + currentPx;
+    
+    // 画面外チェック
+    if (lineX < -50 || lineX > this.els.canvas.width + 50) return;
 
     this.ctx.beginPath();
     this.ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
     this.ctx.lineWidth = 2;
-    this.ctx.moveTo(drawX, y);
-    this.ctx.lineTo(drawX, y + h);
+    this.ctx.moveTo(lineX, y);
+    this.ctx.lineTo(lineX, y + h);
     this.ctx.stroke();
 
+    // ラベル
     this.ctx.fillStyle = "rgba(255,255,255,0.7)";
     this.ctx.font = "9px sans-serif";
-    this.ctx.fillText(label, drawX + 4, y + h/2);
+    this.ctx.fillText(label, lineX + 4, y + h/2);
   }
 
   drawCenterLine(x, h, isActive) {
@@ -398,6 +446,10 @@ class TunerModule {
     for(let k in this.algoHistory) this.algoHistory[k] = [];
   }
 
+  resetSwayHistory() {
+    for(let k in this.algoHistory) this.algoHistory[k] = [];
+  }
+
   updateSwayHistory(key, freq) {
     if (!freq || freq <= 0) return;
     this.algoHistory[key].push(freq);
@@ -408,22 +460,26 @@ class TunerModule {
 
   getSwayStats(key, centerFreq) {
     const hist = this.algoHistory[key];
-    if (hist.length < 2) return { width: 0, diff: 0 };
+    if (hist.length < 2) return { min: 0, max: 0 };
     
-    let minCents = Infinity;
-    let maxCents = -Infinity;
-    let sumCents = 0;
+    let minCents = 0;
+    let maxCents = 0;
     
     for (let f of hist) {
+      if (!f || f <= 0) continue;
+      
+      // 中心周波数からのズレを計算
       const c = 1200 * Math.log2(f / centerFreq);
+      
+      // 異常値（±100セント以上、つまり半音以上のズレ）はノイズとして無視
+      // これにより、大きく外れた値が帯を荒ぶらせるのを防ぐ
+      if (Math.abs(c) > 100) continue;
+
       if (c < minCents) minCents = c;
       if (c > maxCents) maxCents = c;
-      sumCents += c;
     }
     
-    const avgDiff = sumCents / hist.length;
-    const width = maxCents - minCents;
-    return { width: Math.min(width, 100), diff: avgDiff };
+    return { min: minCents, max: maxCents };
   }
 
   // ============================================
