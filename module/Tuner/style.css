@@ -16,8 +16,8 @@ body {
   background: #000;
   font-family: 'Helvetica Neue', Arial, sans-serif;
   color: var(--text-main);
-  height: 100vh;
-  overflow: hidden;
+  height: auto; /* allow page to grow and scroll on small/tablet viewports */
+  overflow: auto;
 }
 
 /* --- Module Container --- */
@@ -25,7 +25,8 @@ body {
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 100%;
+  height: auto;
+  min-height: 100vh; /* ensure it at least fills viewport but allows browser UI changes */
   max-width: 100%;
   background: var(--bg-color);
   position: relative;
@@ -172,10 +173,10 @@ input:focus, select:focus { border-color: var(--accent-ok); }
 
 /* --- Lower Section (Graph) --- */
 .lower-section {
-  flex: 1;
+  flex: 1 0 auto;
   position: relative;
   background: #000;
-  overflow: hidden;
+  overflow: auto; /* allow inner scrolling when content overflows */
   width: 100%;
 }
 
