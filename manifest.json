@@ -2,7 +2,7 @@
   "name": "Suiren Audio Suite",
   "short_name": "SuirenAudio",
   "description": "Professional Audio Analysis & Tuning Suite",
-  "start_url": "./main.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#050505",
   "theme_color": "#00bcd4",
