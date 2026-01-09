@@ -1,0 +1,139 @@
+:root {
+  --bg-color: #0d0d0d;
+  --panel-bg: #141414;
+  --text-main: #fff;
+  --text-sub: #888;
+  --accent-ok: #00e676;
+  --accent-warn: #ffeb3b;
+  --accent-err: #ff1744;
+  --grid-line: #444;
+  --badge-bg: #222;
+  --badge-active: #00bcd4;
+}
+
+/* --- Module Container --- */
+#tuner-app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-color);
+  position: relative;
+  overflow: hidden;
+}
+
+/* --- Upper Section --- */
+.upper-section {
+  flex: 0 0 auto;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: var(--panel-bg);
+  border-bottom: 1px solid #333;
+  position: relative;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Main Readout */
+.tuner-readout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+@media (min-width: 600px) {
+  .tuner-readout {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 20px;
+  }
+}
+
+.note-display {
+  font-size: 5rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1;
+  text-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  transition: color 0.1s;
+  white-space: nowrap;
+  display: flex;
+  align-items: flex-start;
+}
+
+.note-display.active {
+  color: var(--accent-warn);
+  text-shadow: 0 0 30px rgba(255, 235, 59, 0.6);
+}
+
+.note-display.perfect {
+  color: var(--accent-ok);
+  text-shadow: 0 0 50px rgba(0, 230, 118, 0.6);
+}
+
+.octave {
+  font-size: 2rem;
+  color: var(--text-sub);
+  margin-left: 5px;
+  margin-top: 10px;
+}
+
+.cents-display {
+  font-family: 'Courier New', monospace;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--text-sub);
+  min-width: 80px;
+  text-align: center;
+}
+
+@media (min-width: 600px) {
+  .cents-display {
+    text-align: right;
+  }
+}
+
+/* Badges */
+.status-badges {
+  margin-top: 15px;
+  display: flex;
+  gap: 8px;
+}
+
+.badge {
+  font-size: 0.6rem;
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: var(--badge-bg);
+  color: #555;
+  border: 1px solid #333;
+  transition: all 0.2s;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.badge.active {
+  background: var(--badge-active);
+  color: #000;
+  border-color: var(--badge-active);
+  box-shadow: 0 0 10px rgba(0, 188, 212, 0.6);
+}
+
+/* --- Lower Section (Graph) --- */
+.lower-section {
+  flex: 1;
+  position: relative;
+  background: #000;
+  overflow: hidden;
+  width: 100%;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

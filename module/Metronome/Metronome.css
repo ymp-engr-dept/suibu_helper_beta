@@ -1,0 +1,759 @@
+:root {
+    --bg-color: #0d0d0d;
+    --panel-bg: #141414;
+    --text-main: #fff;
+    --text-sub: #888;
+    --accent-primary: #00e676;
+    --accent-secondary: #00bcd4;
+    --accent-downbeat: #ff6b6b;
+    --accent-countin: #ffa726;
+    --grid-line: #333;
+    --btn-bg: #222;
+    --btn-hover: #333;
+    --btn-active: #00e676;
+}
+
+/* --- Module Container --- */
+#metronome-app {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-color);
+    position: relative;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ======================
+   Display Section (大きく表示)
+   ====================== */
+.display-section {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--grid-line);
+    position: relative;
+    min-height: 200px;
+}
+
+.count-container {
+    display: flex;
+    align-items: center;
+    gap: 50px;
+    margin-bottom: 30px;
+}
+
+/* 小節表示 */
+.measure-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.measure-label {
+    font-size: 0.85rem;
+    color: var(--text-sub);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+
+.measure-number {
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: var(--text-sub);
+    font-family: 'SF Mono', 'Monaco', monospace;
+}
+
+/* 拍表示（大きく） */
+.beat-display {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.beat-number {
+    font-size: 10rem;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1;
+    text-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    transition: color 0.1s, text-shadow 0.1s;
+    font-family: 'SF Mono', 'Monaco', monospace;
+}
+
+.beat-number.downbeat {
+    color: var(--accent-downbeat);
+    text-shadow: 0 0 50px rgba(255, 107, 107, 0.6);
+}
+
+.beat-number.active {
+    color: var(--accent-primary);
+    text-shadow: 0 0 50px rgba(0, 230, 118, 0.6);
+}
+
+.beat-separator {
+    font-size: 3rem;
+    color: var(--text-sub);
+    margin: 0 5px;
+}
+
+.beat-total {
+    font-size: 3rem;
+    font-weight: 600;
+    color: var(--text-sub);
+    font-family: 'SF Mono', 'Monaco', monospace;
+}
+
+/* ======================
+   Beat Indicators (丸)
+   ====================== */
+.beat-indicators {
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+    flex-wrap: wrap;
+    max-width: 100%;
+    padding: 0 10px;
+}
+
+.beat-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--btn-bg);
+    border: 2px solid var(--grid-line);
+    transition: all 0.15s ease-out;
+    position: relative;
+}
+
+.beat-dot::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+}
+
+.beat-dot.active {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 25px rgba(0, 230, 118, 0.7);
+    transform: scale(1.25);
+}
+
+.beat-dot.active::after {
+    animation: beatPulse 0.4s ease-out;
+}
+
+.beat-dot.downbeat.active {
+    background: var(--accent-downbeat);
+    border-color: var(--accent-downbeat);
+    box-shadow: 0 0 30px rgba(255, 107, 107, 0.8);
+}
+
+@keyframes beatPulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.6;
+        box-shadow: 0 0 0 0 currentColor;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(2.5);
+        opacity: 0;
+        box-shadow: 0 0 0 15px transparent;
+    }
+}
+
+/* ======================
+   Count-In Overlay (準備カウント)
+   ====================== */
+.count-in-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.count-in-overlay.active {
+    display: flex;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.count-in-text {
+    font-size: 1.2rem;
+    color: var(--accent-countin);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 15px;
+}
+
+.count-in-number {
+    font-size: 12rem;
+    font-weight: 800;
+    color: var(--accent-countin);
+    line-height: 1;
+    text-shadow: 0 0 60px rgba(255, 167, 38, 0.7);
+    font-family: 'SF Mono', 'Monaco', monospace;
+    animation: countInPulse 0.5s ease-out;
+}
+
+@keyframes countInPulse {
+    0% {
+        transform: scale(1.3);
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* ======================
+   Settings Section (コンパクト)
+   ====================== */
+.settings-section {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px 20px;
+    gap: 15px;
+    background: var(--bg-color);
+}
+
+.settings-row {
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.control-label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-sub);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+/* テンポコントロール */
+.tempo-control {
+    width: 200px;
+}
+
+.tempo-input-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.tempo-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 6px;
+    background: var(--btn-bg);
+    color: var(--text-main);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tempo-btn:hover {
+    background: var(--btn-hover);
+}
+
+.tempo-btn:active {
+    transform: scale(0.95);
+    background: var(--accent-secondary);
+}
+
+.tempo-input {
+    width: 80px;
+    height: 40px;
+    border: 2px solid var(--grid-line);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-main);
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-align: center;
+    font-family: 'SF Mono', 'Monaco', monospace;
+    -moz-appearance: textfield;
+    appearance: none;
+}
+
+.tempo-input::-webkit-outer-spin-button,
+.tempo-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.tempo-input:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+}
+
+.tempo-slider {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: linear-gradient(to right, var(--accent-secondary), var(--accent-primary));
+    border-radius: 3px;
+    outline: none;
+}
+
+.tempo-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--text-main);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    transition: transform 0.15s;
+}
+
+.tempo-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+.tempo-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--text-main);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* 拍子コントロール（数値入力） */
+.time-signature-control {
+    width: 140px;
+}
+
+.time-signature-input-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.time-sig-input {
+    width: 50px;
+    height: 40px;
+    border: 2px solid var(--grid-line);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-main);
+    font-size: 1.3rem;
+    font-weight: 600;
+    text-align: center;
+    font-family: 'SF Mono', 'Monaco', monospace;
+    -moz-appearance: textfield;
+    appearance: none;
+}
+
+.time-sig-input::-webkit-outer-spin-button,
+.time-sig-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.time-sig-input:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+}
+
+.time-sig-separator {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-sub);
+}
+
+/* 準備カウントチェックボックス */
+.count-in-control {
+    display: flex;
+    justify-content: center;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.checkbox-input {
+    display: none;
+}
+
+.checkbox-custom {
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--grid-line);
+    border-radius: 4px;
+    background: var(--btn-bg);
+    position: relative;
+    transition: all 0.15s;
+}
+
+.checkbox-input:checked+.checkbox-custom {
+    background: var(--accent-countin);
+    border-color: var(--accent-countin);
+}
+
+.checkbox-custom::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    font-size: 14px;
+    font-weight: bold;
+    color: #000;
+    transition: transform 0.15s;
+}
+
+.checkbox-input:checked+.checkbox-custom::after {
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.checkbox-text {
+    font-size: 0.9rem;
+    color: var(--text-sub);
+}
+
+/* ======================
+   Control Section
+   ====================== */
+.control-section {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 12px;
+    padding: 15px 20px;
+    justify-content: center;
+    background: var(--panel-bg);
+    border-top: 1px solid var(--grid-line);
+}
+
+.control-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 10px;
+    background: var(--btn-bg);
+    color: var(--text-main);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 120px;
+}
+
+.control-btn:hover {
+    background: var(--btn-hover);
+    transform: translateY(-2px);
+}
+
+.control-btn:active {
+    transform: translateY(0);
+}
+
+.btn-icon {
+    font-size: 1.1rem;
+}
+
+.start-btn.playing {
+    background: var(--accent-primary);
+    color: #000;
+}
+
+.start-btn.playing .btn-icon {
+    font-size: 0.9rem;
+}
+
+.start-btn.playing:hover {
+    background: #00c965;
+}
+
+.reset-btn:hover {
+    background: var(--accent-secondary);
+    color: #000;
+}
+
+/* ======================
+   Responsive
+   ====================== */
+@media (max-width: 480px) {
+    .display-section {
+        padding: 25px 15px;
+    }
+
+    .count-container {
+        gap: 30px;
+    }
+
+    .beat-number {
+        font-size: 7rem;
+    }
+
+    .measure-number {
+        font-size: 2.5rem;
+    }
+
+    .count-in-number {
+        font-size: 9rem;
+    }
+
+    .beat-indicators {
+        gap: 12px;
+    }
+
+    .beat-dot {
+        width: 22px;
+        height: 22px;
+    }
+
+    .settings-row {
+        gap: 20px;
+    }
+
+    .control-btn {
+        padding: 10px 18px;
+        min-width: 100px;
+        font-size: 0.85rem;
+    }
+}
+
+/* ======================
+   Subdivision Control (細分化)
+   ====================== */
+.subdivision-control {
+    width: 100px;
+}
+
+.subdivision-input-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.subdivision-input {
+    width: 50px;
+    height: 40px;
+    border: 2px solid var(--grid-line);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-main);
+    font-size: 1.3rem;
+    font-weight: 600;
+    text-align: center;
+    font-family: 'SF Mono', 'Monaco', monospace;
+    -moz-appearance: textfield;
+    appearance: none;
+}
+
+.subdivision-input::-webkit-outer-spin-button,
+.subdivision-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.subdivision-input:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+}
+
+.subdivision-label {
+    font-size: 0.7rem;
+    color: var(--text-sub);
+    white-space: nowrap;
+}
+
+/* 細分化インジケータ */
+.subdivision-indicator {
+    display: flex;
+    gap: 6px;
+    margin-top: 15px;
+    justify-content: center;
+}
+
+.subdivision-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--btn-bg);
+    border: 1px solid var(--grid-line);
+    transition: all 0.1s ease-out;
+}
+
+.subdivision-dot.active {
+    background: var(--accent-secondary);
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 10px rgba(0, 188, 212, 0.6);
+    transform: scale(1.3);
+}
+
+/* ======================
+   Options Row (オプション行)
+   ====================== */
+.options-row {
+    display: flex;
+    gap: 25px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* ======================
+   Tap Tempo Button
+   ====================== */
+.tap-tempo-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: 2px solid var(--accent-secondary);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--accent-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.tap-tempo-btn:hover {
+    background: var(--accent-secondary);
+    color: #000;
+}
+
+.tap-tempo-btn:active {
+    transform: scale(0.95);
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.tap-tempo-btn.tapping {
+    background: var(--accent-secondary);
+    color: #000;
+    animation: tapPulse 0.2s ease-out;
+}
+
+@keyframes tapPulse {
+    0% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.tap-icon {
+    font-size: 1rem;
+}
+
+.tap-text {
+    letter-spacing: 1px;
+}
+
+/* ======================
+   Volume Control (音量調節)
+   ====================== */
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.volume-icon {
+    font-size: 1rem;
+}
+
+.volume-slider {
+    width: 80px;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: linear-gradient(to right, var(--accent-secondary), var(--accent-primary));
+    border-radius: 3px;
+    outline: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text-main);
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+    transition: transform 0.15s;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text-main);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.volume-value {
+    font-size: 0.75rem;
+    color: var(--text-sub);
+    min-width: 35px;
+    text-align: right;
+}

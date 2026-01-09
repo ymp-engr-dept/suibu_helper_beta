@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Suiren Audio Suite</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#00bcd4">
+  <link rel="stylesheet" href="main.css">
+</head>
+
+<body>
+  <header>
+    <div class="brand">
+      <button class="menu-toggle" id="menuToggle">☰</button>
+      SUIREN AUDIO LAB
+    </div>
+    <div class="status-badge" id="globalStatusBadge">Click to Start</div>
+  </header>
+
+  <!-- グローバルオーディオ設定パネル -->
+  <div class="global-audio-panel" id="globalAudioPanel">
+    <div class="audio-controls-row">
+      <div class="control-group">
+        <label class="control-item">
+          <span class="label-text">感度</span>
+          <input id="globalGainInput" type="number" value="1.0" min="0.1" max="10" step="0.1">
+        </label>
+        <label class="control-item">
+          <span class="label-text">A4</span>
+          <input id="globalA4Input" type="number" value="442" min="400" max="480" step="1">
+        </label>
+      </div>
+      <div class="control-group">
+        <label class="control-item">
+          <span class="label-text">音名</span>
+          <select id="globalNotationSelect">
+            <option value="C">English</option>
+            <option value="JP_C">日本語</option>
+            <option value="JP_Bb">B♭管</option>
+            <option value="JP_Eb">E♭管</option>
+            <option value="JP_F">F管</option>
+          </select>
+        </label>
+      </div>
+      <div class="control-group button-group">
+        <button id="globalFreezeBtn" class="btn">フリーズ</button>
+        <button id="globalRecordBtn" class="btn record-btn">● 録音</button>
+        <label class="btn file-btn">
+          ファイル
+          <input type="file" id="globalFileInput" accept="audio/*" hidden>
+        </label>
+      </div>
+      <div class="control-group mode-group">
+        <label class="mode-switch">
+          <input type="checkbox" id="globalSourceModeCheckbox">
+          <span class="slider"></span>
+          <span class="mode-label">File Mode</span>
+        </label>
+      </div>
+      <div class="control-group mode-group">
+        <label class="practice-mode-switch" id="practiceModeSwitch">
+          <span class="practice-mode-label solo-label">個人練</span>
+          <input type="checkbox" id="globalPracticeModeCheckbox">
+          <span class="practice-slider"></span>
+          <span class="practice-mode-label ensemble-label">合奏</span>
+        </label>
+      </div>
+      <div class="player-compact disabled" id="globalPlayerInterface">
+        <button id="globalPlayPauseBtn" class="icon-btn-sm" disabled>▶</button>
+        <span id="globalCurrentTimeDisplay" class="time-sm">0:00</span>
+        <input type="range" id="globalAudioSeekBar" value="0" step="0.01" min="0" max="100" disabled>
+        <span id="globalDurationDisplay" class="time-sm">0:00</span>
+        <input type="range" id="globalVolumeSlider" class="volume-sm" min="0" max="1" step="0.01" value="1" disabled>
+        <select id="globalPlaybackRateSelect" class="rate-sm" disabled>
+          <option value="0.5">x0.5</option>
+          <option value="1.0" selected>x1</option>
+          <option value="1.5">x1.5</option>
+          <option value="2.0">x2</option>
+        </select>
+      </div>
+    </div>
+    <audio id="globalAudioEngine" style="display: none;"></audio>
+  </div>
+
+  <div class="app-body">
+    <!-- モジュールドロワー -->
+    <aside class="module-drawer" id="moduleDrawer">
+      <div class="drawer-toggle" id="drawerToggle">
+        <span class="toggle-icon">◀</span>
+      </div>
+      <div class="drawer-content">
+        <div class="drawer-header">Modules</div>
+        <div class="module-list" id="moduleList">
+          <!-- モジュールカードはJSで動的生成 -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- ワークスペース -->
+    <main class="workspace" id="workspace">
+      <!-- ルートコンテナ -->
+      <div class="layout-root" id="layoutRoot"></div>
+
+      <!-- 空の状態 -->
+      <div class="workspace-empty" id="workspaceEmpty">
+        <div class="empty-icon">📦</div>
+        <div class="empty-text">モジュールをドラッグ&ドロップ</div>
+      </div>
+
+      <!-- ドロップゾーンオーバーレイ -->
+      <div class="drop-zones" id="dropZones">
+        <div class="drop-zone zone-center" data-zone="center"></div>
+        <div class="drop-zone zone-top" data-zone="top"></div>
+        <div class="drop-zone zone-bottom" data-zone="bottom"></div>
+        <div class="drop-zone zone-left" data-zone="left"></div>
+        <div class="drop-zone zone-right" data-zone="right"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- モジュールパネルテンプレート -->
+  <template id="modulePanelTemplate">
+    <div class="module-panel">
+      <div class="panel-header">
+        <span class="panel-title"></span>
+        <button class="panel-menu-btn" title="メニュー">☰</button>
+      </div>
+      <div class="panel-content"></div>
+      <div class="panel-menu">
+        <button class="menu-item delete-item">🗑 削除</button>
+      </div>
+      <!-- パネル内ドロップゾーン -->
+      <div class="panel-drop-zones">
+        <div class="panel-drop-zone pdz-top" data-zone="top"></div>
+        <div class="panel-drop-zone pdz-bottom" data-zone="bottom"></div>
+        <div class="panel-drop-zone pdz-left" data-zone="left"></div>
+        <div class="panel-drop-zone pdz-right" data-zone="right"></div>
+      </div>
+    </div>
+  </template>
+
+  <script src="main.js"></script>
+</body>
+
+</html>

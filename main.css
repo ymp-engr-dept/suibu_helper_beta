@@ -1,0 +1,810 @@
+:root {
+    --sidebar-width: 50px;
+    --sidebar-expanded: 180px;
+    --header-height: 50px;
+    --audio-panel-height: 50px;
+    --bg-dark: #0a0a0a;
+    --bg-panel: #111;
+    --bg-drawer: #0a0a0a;
+    --accent: #00bcd4;
+    --accent-glow: rgba(0, 188, 212, 0.3);
+    --text-main: #eee;
+    --text-sub: #777;
+    --border-color: #2a2a2a;
+    --record-color: #ff5252;
+    --panel-bg: #141414;
+    --panel-header: #1a1a1a;
+    --splitter-size: 4px;
+    --splitter-color: #333;
+    --splitter-hover: var(--accent);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 13px;
+}
+
+/* --- Header --- */
+header {
+    height: var(--header-height);
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    justify-content: space-between;
+    flex-shrink: 0;
+}
+
+.brand {
+    font-size: 1rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.status-badge {
+    font-size: 0.7rem;
+    color: var(--text-sub);
+    border: 1px solid var(--border-color);
+    padding: 3px 10px;
+    border-radius: 10px;
+}
+
+.status-badge.mic-ready {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.status-badge.file-mode {
+    color: #ffc107;
+    border-color: #ffc107;
+}
+
+/* --- Audio Panel --- */
+.global-audio-panel {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border-color);
+    padding: 8px 15px;
+    flex-shrink: 0;
+}
+
+.audio-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.control-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.label-text {
+    font-size: 0.65rem;
+    color: var(--text-sub);
+    text-transform: uppercase;
+}
+
+.global-audio-panel input[type="number"] {
+    background: #1a1a1a;
+    border: 1px solid var(--border-color);
+    color: white;
+    padding: 4px 6px;
+    border-radius: 3px;
+    width: 55px;
+    font-size: 0.8rem;
+}
+
+.global-audio-panel select {
+    background: #1a1a1a;
+    color: white;
+    border: 1px solid var(--border-color);
+    padding: 4px 6px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+}
+
+.btn {
+    background: #222;
+    color: white;
+    border: 1px solid var(--border-color);
+    padding: 5px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.btn:hover {
+    background: #333;
+    border-color: var(--accent);
+}
+
+.btn.active {
+    background: var(--accent);
+    color: #000;
+}
+
+.record-btn {
+    color: var(--record-color);
+}
+
+.record-btn.recording {
+    background: #500;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.mode-switch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.mode-switch input {
+    display: none;
+}
+
+.mode-switch .slider {
+    width: 32px;
+    height: 16px;
+    background: #333;
+    border-radius: 8px;
+    position: relative;
+    transition: background 0.2s;
+}
+
+.mode-switch .slider::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #888;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: all 0.2s;
+}
+
+.mode-switch input:checked+.slider {
+    background: var(--accent);
+}
+
+.mode-switch input:checked+.slider::after {
+    left: 18px;
+    background: white;
+}
+
+.mode-label {
+    font-size: 0.7rem;
+    color: var(--text-sub);
+}
+
+/* --- Practice Mode Switch (Solo/Ensemble) --- */
+.practice-mode-switch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.practice-mode-switch input {
+    display: none;
+}
+
+.practice-mode-label {
+    font-size: 0.65rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.practice-mode-label.solo-label {
+    color: var(--accent);
+}
+
+.practice-mode-label.ensemble-label {
+    color: var(--text-sub);
+}
+
+.practice-mode-switch input:checked~.solo-label {
+    color: var(--text-sub);
+}
+
+.practice-mode-switch input:checked~.ensemble-label {
+    color: #ff9800;
+}
+
+.practice-slider {
+    width: 36px;
+    height: 18px;
+    background: linear-gradient(90deg, var(--accent), var(--accent));
+    border-radius: 9px;
+    position: relative;
+    transition: background 0.3s;
+}
+
+.practice-slider::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: all 0.3s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.practice-mode-switch input:checked+.practice-slider {
+    background: linear-gradient(90deg, #ff9800, #f57c00);
+}
+
+.practice-mode-switch input:checked+.practice-slider::after {
+    left: 20px;
+}
+
+/* Status badge for ensemble mode */
+.status-badge.ensemble-mode {
+    color: #ff9800;
+    border-color: #ff9800;
+    animation: pulse-ensemble 2s infinite;
+}
+
+@keyframes pulse-ensemble {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.player-compact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.player-compact.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.icon-btn-sm {
+    width: 26px;
+    height: 26px;
+    background: #222;
+    border: 1px solid var(--border-color);
+    color: white;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.time-sm {
+    font-family: monospace;
+    font-size: 0.7rem;
+    color: var(--text-sub);
+    width: 32px;
+}
+
+.global-audio-panel input[type="range"] {
+    height: 3px;
+    background: #333;
+    border-radius: 2px;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    flex: 1;
+    min-width: 80px;
+    max-width: 150px;
+}
+
+.global-audio-panel input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    background: #ddd;
+    border-radius: 50%;
+}
+
+.volume-sm {
+    width: 60px !important;
+    min-width: 60px !important;
+}
+
+.rate-sm {
+    width: 50px;
+    padding: 2px !important;
+    font-size: 0.7rem !important;
+}
+
+/* --- Main Layout --- */
+.app-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - var(--header-height) - var(--audio-panel-height) - 18px);
+}
+
+/* --- Module Drawer --- */
+.module-drawer {
+    width: var(--sidebar-width);
+    background: var(--bg-drawer);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    transition: width 0.25s ease;
+    z-index: 50;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.module-drawer.expanded {
+    width: var(--sidebar-expanded);
+}
+
+.drawer-toggle {
+    position: absolute;
+    right: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 40px;
+    background: var(--bg-drawer);
+    border: 1px solid var(--border-color);
+    border-left: none;
+    border-radius: 0 6px 6px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 51;
+}
+
+.toggle-icon {
+    font-size: 0.6rem;
+    color: var(--text-sub);
+    transition: transform 0.25s;
+}
+
+.module-drawer.expanded .toggle-icon {
+    transform: rotate(180deg);
+}
+
+.drawer-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.drawer-header {
+    padding: 12px 10px;
+    font-size: 0.6rem;
+    color: var(--text-sub);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--border-color);
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.module-drawer.expanded .drawer-header {
+    opacity: 1;
+}
+
+.module-list {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.module-card {
+    background: #1a1a1a;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px;
+    cursor: grab;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.module-card:hover {
+    border-color: var(--accent);
+    background: #222;
+}
+
+.module-card:active {
+    cursor: grabbing;
+}
+
+.module-card.dragging {
+    opacity: 0.5;
+}
+
+.module-icon {
+    font-size: 1.2rem;
+}
+
+.module-name {
+    font-size: 0.75rem;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.module-drawer.expanded .module-name {
+    opacity: 1;
+}
+
+/* --- Workspace --- */
+.workspace {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-dark);
+}
+
+.layout-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+}
+
+.workspace-empty {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--text-sub);
+    pointer-events: none;
+    z-index: 5;
+}
+
+.workspace-empty.hidden {
+    display: none;
+}
+
+.empty-icon {
+    font-size: 3rem;
+    opacity: 0.3;
+    margin-bottom: 10px;
+}
+
+.empty-text {
+    font-size: 0.8rem;
+}
+
+/* --- Drop Zones --- */
+.drop-zones {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    display: none;
+}
+
+.drop-zones.active {
+    display: block;
+    pointer-events: auto;
+}
+
+.drop-zone {
+    position: absolute;
+    background: transparent;
+    transition: background 0.15s;
+}
+
+.drop-zone.highlight {
+    background: var(--accent-glow);
+    border: 2px dashed var(--accent);
+}
+
+.zone-center {
+    inset: 25% 25%;
+    border-radius: 8px;
+}
+
+.zone-top {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 25%;
+}
+
+.zone-bottom {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 25%;
+}
+
+.zone-left {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 25%;
+}
+
+.zone-right {
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 25%;
+}
+
+/* --- Split Container --- */
+.split-container {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+.split-container.horizontal {
+    flex-direction: row;
+}
+
+.split-container.vertical {
+    flex-direction: column;
+}
+
+/* --- Splitter --- */
+.splitter {
+    background: var(--splitter-color);
+    flex-shrink: 0;
+    transition: background 0.15s;
+    position: relative;
+    z-index: 10;
+}
+
+.splitter:hover,
+.splitter.active {
+    background: var(--splitter-hover);
+}
+
+.splitter.horizontal {
+    width: var(--splitter-size);
+    cursor: col-resize;
+}
+
+.splitter.vertical {
+    height: var(--splitter-size);
+    cursor: row-resize;
+}
+
+/* --- Module Panel --- */
+.module-panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    min-width: 100px;
+    min-height: 80px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.panel-header {
+    background: var(--panel-header);
+    padding: 5px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    min-height: 28px;
+}
+
+.panel-title {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--text-main);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.panel-menu-btn {
+    width: 22px;
+    height: 22px;
+    background: transparent;
+    border: none;
+    color: var(--text-sub);
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    transition: all 0.15s;
+}
+
+.panel-menu-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+}
+
+.panel-menu-btn:active {
+    cursor: grabbing;
+}
+
+.panel-menu-btn.dragging {
+    opacity: 0.5;
+}
+
+.panel-content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+}
+
+.panel-menu {
+    position: absolute;
+    top: 28px;
+    right: 4px;
+    background: #222;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px;
+    z-index: 200;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.panel-menu.open {
+    display: block;
+}
+
+.menu-item {
+    display: block;
+    width: 100%;
+    padding: 6px 10px;
+    background: none;
+    border: none;
+    color: var(--text-main);
+    font-size: 0.7rem;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+
+.menu-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.delete-item:hover {
+    background: rgba(255, 82, 82, 0.2);
+    color: var(--record-color);
+}
+
+/* --- Panel Drop Zones --- */
+.panel-drop-zones {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    display: none;
+}
+
+.module-panel.drag-over .panel-drop-zones {
+    display: block;
+    pointer-events: auto;
+}
+
+.panel-drop-zone {
+    position: absolute;
+    background: transparent;
+    transition: background 0.1s;
+}
+
+.panel-drop-zone.highlight {
+    background: var(--accent-glow);
+}
+
+.pdz-top {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 30%;
+}
+
+.pdz-bottom {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30%;
+}
+
+.pdz-left {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 30%;
+}
+
+.pdz-right {
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 30%;
+}
+
+/* --- Mobile --- */
+@media (max-width: 768px) {
+    .module-drawer {
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        transform: translateX(-100%);
+        z-index: 100;
+    }
+
+    .module-drawer.expanded {
+        transform: translateX(0);
+    }
+
+    .menu-toggle {
+        display: block;
+    }
+}
