@@ -94,9 +94,23 @@ class GlobalAudioManager {
         this.els.practiceMode?.addEventListener('change', () => {
             if (!this.audioContext) this.initAudio();
             this.setPracticeMode(this.els.practiceMode.checked ? 'ensemble' : 'solo');
+            this.saveSettings(); // 設定を保存
         });
 
+        // === 設定変更時の自動保存 ===
+        this.els.gain?.addEventListener('change', () => this.saveSettings());
+        this.els.a4?.addEventListener('change', () => this.saveSettings());
+        this.els.notation?.addEventListener('change', () => this.saveSettings());
+        this.els.volumeSlider?.addEventListener('change', () => this.saveSettings());
+        this.els.playbackRate?.addEventListener('change', () => this.saveSettings());
+
         this.setupPlayerEvents();
+
+        // 起動時に設定を復元
+        this.restoreSettings();
+
+        // プリセットシステムを初期化
+        this.setupPresetSystem();
     }
 
     async initAudio() {
@@ -292,9 +306,40 @@ class GlobalAudioManager {
     updateStatusBadge(status, text) {
         const badge = this.els.statusBadge;
         if (!badge) return;
-        badge.className = 'status-badge';
-        if (status) badge.classList.add(status);
-        badge.textContent = text;
+
+        // 新しいstatus-indicator構造に対応
+        if (badge.classList.contains('status-indicator')) {
+            badge.className = 'status-indicator';
+            if (status) badge.classList.add(status);
+            const textEl = badge.querySelector('.status-text');
+            if (textEl) textEl.textContent = text;
+        } else {
+            // 旧構造にもフォールバック対応
+            badge.className = 'status-badge';
+            if (status) badge.classList.add(status);
+            badge.textContent = text;
+        }
+
+        // practiceModeIndicatorも更新
+        this.updatePracticeModeIndicator();
+    }
+
+    updatePracticeModeIndicator() {
+        const indicator = document.getElementById('practiceModeIndicator');
+        if (!indicator) return;
+
+        const iconEl = indicator.querySelector('.mode-icon');
+        const textEl = indicator.querySelector('.mode-text');
+
+        if (this.practiceMode === 'ensemble') {
+            indicator.classList.add('ensemble');
+            if (iconEl) iconEl.textContent = '👥';
+            if (textEl) textEl.textContent = '合奏';
+        } else {
+            indicator.classList.remove('ensemble');
+            if (iconEl) iconEl.textContent = '👤';
+            if (textEl) textEl.textContent = '個人練';
+        }
     }
 
     setupRecorder(stream) {
@@ -454,10 +499,273 @@ class GlobalAudioManager {
     getNotation() { return this.els.notation?.value || 'C'; }
     isFreezeActive() { return this.isFrozen; }
     getMicStream() { return this.micStream; }
+
+    // ========================================
+    // 設定の保存・復元
+    // ========================================
+
+    /**
+     * 共通設定を保存
+     */
+    saveSettings() {
+        const settings = {
+            version: 1,
+            gain: this.els.gain?.value || '1',
+            a4: this.els.a4?.value || '442',
+            notation: this.els.notation?.value || 'C',
+            practiceMode: this.practiceMode || 'solo',
+            volume: this.els.volumeSlider?.value || '0.8',
+            playbackRate: this.els.playbackRate?.value || '1'
+        };
+        localStorage.setItem('suiren-settings-v1', JSON.stringify(settings));
+        console.log('💾 Settings saved:', settings);
+    }
+
+    /**
+     * 共通設定を復元
+     */
+    restoreSettings() {
+        const saved = localStorage.getItem('suiren-settings-v1');
+        if (!saved) return;
+
+        try {
+            const settings = JSON.parse(saved);
+            console.log('📂 Restoring settings:', settings);
+
+            // 各設定を復元
+            if (settings.gain && this.els.gain) {
+                this.els.gain.value = settings.gain;
+            }
+            if (settings.a4 && this.els.a4) {
+                this.els.a4.value = settings.a4;
+            }
+            if (settings.notation && this.els.notation) {
+                this.els.notation.value = settings.notation;
+            }
+            if (settings.volume && this.els.volumeSlider) {
+                this.els.volumeSlider.value = settings.volume;
+                if (this.els.audioEngine) {
+                    this.els.audioEngine.volume = parseFloat(settings.volume);
+                }
+            }
+            if (settings.playbackRate && this.els.playbackRate) {
+                this.els.playbackRate.value = settings.playbackRate;
+                if (this.els.audioEngine) {
+                    this.els.audioEngine.playbackRate = parseFloat(settings.playbackRate);
+                }
+            }
+            if (settings.practiceMode && this.els.practiceMode) {
+                this.els.practiceMode.checked = settings.practiceMode === 'ensemble';
+                this.practiceMode = settings.practiceMode;
+            }
+        } catch (e) {
+            console.error('Settings restore failed:', e);
+        }
+    }
+
+    // ========================================
+    // プリセット管理
+    // ========================================
+
+    /**
+     * プリセットUI要素をバインド
+     */
+    bindPresetElements() {
+        this.presetEls = {
+            nameInput: document.getElementById('presetNameInput'),
+            saveBtn: document.getElementById('presetSaveBtn'),
+            listBtn: document.getElementById('presetListBtn'),
+            list: document.getElementById('presetList')
+        };
+    }
+
+    /**
+     * プリセット機能をセットアップ
+     */
+    setupPresetSystem() {
+        this.bindPresetElements();
+
+        // 保存ボタン
+        this.presetEls.saveBtn?.addEventListener('click', () => {
+            const name = this.presetEls.nameInput?.value.trim();
+            if (!name) {
+                alert('プリセット名を入力してください');
+                return;
+            }
+            this.savePreset(name);
+            this.presetEls.nameInput.value = '';
+        });
+
+        // リストボタン（トグル）
+        this.presetEls.listBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.presetEls.list?.classList.toggle('open');
+            this.renderPresetList();
+        });
+
+        // リスト外クリックで閉じる
+        document.addEventListener('click', (e) => {
+            if (!this.presetEls.list?.contains(e.target) &&
+                !this.presetEls.listBtn?.contains(e.target)) {
+                this.presetEls.list?.classList.remove('open');
+            }
+        });
+
+        // 初回リスト描画
+        this.renderPresetList();
+    }
+
+    /**
+     * プリセット一覧を取得
+     */
+    getPresets() {
+        const saved = localStorage.getItem('suiren-presets');
+        return saved ? JSON.parse(saved) : {};
+    }
+
+    /**
+     * プリセット一覧を保存
+     */
+    savePresetsRegistry(presets) {
+        localStorage.setItem('suiren-presets', JSON.stringify(presets));
+    }
+
+    /**
+     * プリセットを保存
+     */
+    savePreset(name) {
+        const presets = this.getPresets();
+
+        // 現在の設定を取得
+        const settings = {
+            gain: this.els.gain?.value || '1',
+            a4: this.els.a4?.value || '442',
+            notation: this.els.notation?.value || 'C',
+            practiceMode: this.practiceMode || 'solo',
+            volume: this.els.volumeSlider?.value || '0.8',
+            playbackRate: this.els.playbackRate?.value || '1'
+        };
+
+        // 現在のレイアウトを取得
+        const layout = localStorage.getItem('suiren-layout-v12');
+
+        presets[name] = {
+            settings,
+            layout: layout ? JSON.parse(layout) : null,
+            savedAt: new Date().toISOString()
+        };
+
+        this.savePresetsRegistry(presets);
+        this.renderPresetList();
+        console.log('✅ Preset saved:', name);
+    }
+
+    /**
+     * プリセットをロード
+     */
+    async loadPreset(name) {
+        const presets = this.getPresets();
+        const preset = presets[name];
+        if (!preset) return;
+
+        console.log('📂 Loading preset:', name, preset);
+
+        // 設定を復元
+        if (preset.settings) {
+            if (preset.settings.gain && this.els.gain) {
+                this.els.gain.value = preset.settings.gain;
+            }
+            if (preset.settings.a4 && this.els.a4) {
+                this.els.a4.value = preset.settings.a4;
+            }
+            if (preset.settings.notation && this.els.notation) {
+                this.els.notation.value = preset.settings.notation;
+            }
+            if (preset.settings.volume && this.els.volumeSlider) {
+                this.els.volumeSlider.value = preset.settings.volume;
+                if (this.els.audioEngine) {
+                    this.els.audioEngine.volume = parseFloat(preset.settings.volume);
+                }
+            }
+            if (preset.settings.playbackRate && this.els.playbackRate) {
+                this.els.playbackRate.value = preset.settings.playbackRate;
+                if (this.els.audioEngine) {
+                    this.els.audioEngine.playbackRate = parseFloat(preset.settings.playbackRate);
+                }
+            }
+            if (preset.settings.practiceMode && this.els.practiceMode) {
+                this.els.practiceMode.checked = preset.settings.practiceMode === 'ensemble';
+                this.practiceMode = preset.settings.practiceMode;
+            }
+        }
+
+        // レイアウトを復元
+        if (preset.layout) {
+            localStorage.setItem('suiren-layout-v12', JSON.stringify(preset.layout));
+            // レイアウトマネージャーに復元を依頼
+            if (window.layoutManager) {
+                await window.layoutManager.restoreLayout();
+            }
+        }
+
+        this.presetEls.list?.classList.remove('open');
+    }
+
+    /**
+     * プリセットを削除
+     */
+    deletePreset(name) {
+        if (!confirm(`プリセット「${name}」を削除しますか？`)) return;
+
+        const presets = this.getPresets();
+        delete presets[name];
+        this.savePresetsRegistry(presets);
+        this.renderPresetList();
+        console.log('🗑 Preset deleted:', name);
+    }
+
+    /**
+     * プリセットリストを描画
+     */
+    renderPresetList() {
+        if (!this.presetEls?.list) return;
+
+        const presets = this.getPresets();
+        const names = Object.keys(presets);
+
+        if (names.length === 0) {
+            this.presetEls.list.innerHTML = '<div class="preset-empty">プリセットなし</div>';
+            return;
+        }
+
+        this.presetEls.list.innerHTML = names.map(name => `
+            <div class="preset-item" data-name="${name}">
+                <span class="preset-item-name">${name}</span>
+                <button class="preset-item-delete" title="削除">🗑</button>
+            </div>
+        `).join('');
+
+        // イベントリスナー設定
+        this.presetEls.list.querySelectorAll('.preset-item-name').forEach(el => {
+            el.addEventListener('click', () => {
+                const name = el.parentElement.dataset.name;
+                this.loadPreset(name);
+            });
+        });
+
+        this.presetEls.list.querySelectorAll('.preset-item-delete').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const name = el.parentElement.dataset.name;
+                this.deletePreset(name);
+            });
+        });
+    }
 }
 
 /**
  * TreeLayoutManager - ツリーベースの上下左右分割レイアウト管理
+ * タッチ操作対応版
  */
 class TreeLayoutManager {
     constructor(app) {
@@ -466,6 +774,10 @@ class TreeLayoutManager {
         this.panels = new Map();
         this.moduleInWorkspace = new Set();
         this.moduleRegistry = []; // modules.jsonから読み込んだモジュール情報
+
+        // === 最小サイズ制約 ===
+        this.MIN_PANEL_WIDTH = 150;
+        this.MIN_PANEL_HEIGHT = 120;
 
         this.drawer = document.getElementById('moduleDrawer');
         this.drawerToggle = document.getElementById('drawerToggle');
@@ -483,14 +795,33 @@ class TreeLayoutManager {
         this.currentHoverZone = null;
         this.currentHoverPanelZone = null;
 
+        // === タッチドラッグ状態 ===
+        this.touchDragState = null;
+        this.isTouchDragging = false;
+
         this.init();
     }
 
     async init() {
-        this.drawerToggle?.addEventListener('click', () => this.drawer.classList.toggle('expanded'));
+        // ドロワー3段階制御: 閉→アイコン→展開→閉
+        this.drawerToggle?.addEventListener('click', () => {
+            if (this.drawer.classList.contains('expanded')) {
+                // 展開 → 完全閉鎖
+                this.drawer.classList.remove('expanded');
+                this.drawer.classList.remove('icons-only');
+            } else if (this.drawer.classList.contains('icons-only')) {
+                // アイコン → 展開
+                this.drawer.classList.remove('icons-only');
+                this.drawer.classList.add('expanded');
+            } else {
+                // 完全閉鎖 → アイコン
+                this.drawer.classList.add('icons-only');
+            }
+        });
 
         // modules.jsonを読み込んでモジュールカードを動的生成
         await this.loadModuleRegistry();
+
 
         // ワークスペースのドロップイベント
         this.setupWorkspaceDropEvents();
@@ -505,6 +836,43 @@ class TreeLayoutManager {
             if (this.isLiftDragging) this.onLiftDrop(e);
         });
 
+        // === グローバルタッチイベント ===
+        document.addEventListener('touchmove', (e) => {
+            if (this.activeSplitter) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                this.onSplitterDrag({ clientX: touch.clientX, clientY: touch.clientY });
+            }
+            if (this.isLiftDragging || this.isTouchDragging) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                this.onLiftDrag({ clientX: touch.clientX, clientY: touch.clientY });
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', (e) => {
+            if (this.activeSplitter) {
+                this.onSplitterDragEnd();
+            }
+            if (this.isLiftDragging || this.isTouchDragging) {
+                const touch = e.changedTouches[0];
+                this.onLiftDrop({ clientX: touch.clientX, clientY: touch.clientY });
+                this.isTouchDragging = false;
+            }
+            if (this.touchDragState) {
+                this.onTouchDragEnd(e);
+            }
+        });
+
+        document.addEventListener('touchcancel', () => {
+            this.activeSplitter = null;
+            this.isLiftDragging = false;
+            this.isTouchDragging = false;
+            this.touchDragState = null;
+            this.onDragEnd();
+            document.body.style.cursor = '';
+        });
+
         // メニュー閉じる
         document.addEventListener('click', (e) => {
             if (this.activeMenu && !e.target.closest('.panel-menu') && !e.target.closest('.panel-menu-btn')) {
@@ -514,6 +882,107 @@ class TreeLayoutManager {
         });
 
         this.restoreLayout();
+
+        // === リサイズ時のレイアウト自動調整 ===
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                this.normalizeLayout();
+            }, 150);
+        });
+    }
+
+    /**
+     * レイアウトを正規化（ワークスペースサイズに合わせて調整）
+     */
+    normalizeLayout() {
+        const root = this.layoutRoot.firstElementChild;
+        if (!root) return;
+
+        const workspaceRect = this.workspace.getBoundingClientRect();
+        console.log('🔧 Normalizing layout to:', workspaceRect.width, 'x', workspaceRect.height);
+
+        this.normalizeSplitContainer(root, workspaceRect.width, workspaceRect.height);
+        this.saveLayout();
+    }
+
+    /**
+     * split-containerを正規化
+     */
+    normalizeSplitContainer(element, availableWidth, availableHeight) {
+        if (!element) return;
+
+        if (element.classList.contains('module-panel')) {
+            // 単一パネルの場合、サイズを100%に
+            element.style.width = '';
+            element.style.height = '';
+            element.style.flex = '1';
+            return;
+        }
+
+        if (!element.classList.contains('split-container')) return;
+
+        const direction = element.classList.contains('vertical') ? 'vertical' : 'horizontal';
+        const children = Array.from(element.children).filter(c => !c.classList.contains('splitter'));
+        const splitterCount = children.length - 1;
+        const splitterSize = 4; // CSSの--splitter-size
+
+        if (children.length === 0) return;
+
+        // 利用可能なサイズを計算
+        const totalSplitterSize = splitterCount * splitterSize;
+        const availableSize = direction === 'horizontal'
+            ? availableWidth - totalSplitterSize
+            : availableHeight - totalSplitterSize;
+
+        // 現在の子要素のサイズを取得
+        const childSizes = children.map(child => {
+            const rect = child.getBoundingClientRect();
+            return direction === 'horizontal' ? rect.width : rect.height;
+        });
+
+        const totalCurrentSize = childSizes.reduce((sum, s) => sum + s, 0);
+
+        // 比率を計算して新しいサイズを適用
+        const minSize = direction === 'horizontal' ? this.MIN_PANEL_WIDTH : this.MIN_PANEL_HEIGHT;
+
+        children.forEach((child, i) => {
+            // 比率を維持しながらサイズを調整
+            let ratio = totalCurrentSize > 0 ? childSizes[i] / totalCurrentSize : 1 / children.length;
+            let newSize = Math.max(minSize, Math.round(availableSize * ratio));
+
+            // 最後の要素は残りのスペースを使用
+            if (i === children.length - 1) {
+                const usedSize = children.slice(0, -1).reduce((sum, c) => {
+                    const rect = c.getBoundingClientRect();
+                    return sum + (direction === 'horizontal' ? rect.width : rect.height);
+                }, 0);
+                newSize = Math.max(minSize, availableSize - usedSize);
+            }
+
+            if (direction === 'horizontal') {
+                child.style.width = newSize + 'px';
+                child.style.height = '';
+                child.style.flex = 'none';
+            } else {
+                child.style.height = newSize + 'px';
+                child.style.width = '';
+                child.style.flex = 'none';
+            }
+
+            // 再帰的に子要素を正規化
+            const childRect = child.getBoundingClientRect();
+            if (child.classList.contains('split-container')) {
+                this.normalizeSplitContainer(child, childRect.width, childRect.height);
+            } else if (child.classList.contains('module-panel')) {
+                // パネルの中にネストされたコンテナがある場合
+                const nestedContainer = child.querySelector('.split-container');
+                if (nestedContainer) {
+                    this.normalizeSplitContainer(nestedContainer, childRect.width, childRect.height);
+                }
+            }
+        });
     }
 
     async loadModuleRegistry() {
@@ -543,12 +1012,91 @@ class TreeLayoutManager {
         <span class="module-name">${mod.title}</span>
       `;
 
-            // ドラッグイベント設定
+            // ドラッグイベント設定（マウス）
             card.addEventListener('dragstart', (e) => this.onCardDragStart(e, card));
             card.addEventListener('dragend', () => this.onDragEnd());
 
+            // タッチイベント設定
+            card.addEventListener('touchstart', (e) => this.onCardTouchStart(e, card), { passive: false });
+
             this.moduleList.appendChild(card);
         });
+    }
+
+    /**
+     * モジュールカードのタッチ開始
+     */
+    onCardTouchStart(e, card) {
+        e.preventDefault();
+        const touch = e.touches[0];
+
+        this.touchDragState = {
+            card,
+            startX: touch.clientX,
+            startY: touch.clientY,
+            moved: false
+        };
+
+        // 長押しでドラッグ開始（200ms後）
+        this.touchDragState.timer = setTimeout(() => {
+            if (this.touchDragState && this.touchDragState.card === card) {
+                this.startTouchDrag(card, touch.clientX, touch.clientY);
+            }
+        }, 200);
+
+        // タッチ移動を監視
+        const onTouchMove = (e) => {
+            if (!this.touchDragState) return;
+            const touch = e.touches[0];
+            const dx = Math.abs(touch.clientX - this.touchDragState.startX);
+            const dy = Math.abs(touch.clientY - this.touchDragState.startY);
+
+            if (dx > 10 || dy > 10) {
+                this.touchDragState.moved = true;
+                clearTimeout(this.touchDragState.timer);
+                this.startTouchDrag(card, touch.clientX, touch.clientY);
+                document.removeEventListener('touchmove', onTouchMove);
+            }
+        };
+
+        document.addEventListener('touchmove', onTouchMove, { passive: false });
+
+        // タッチ終了時にクリーンアップ
+        const onTouchEnd = () => {
+            clearTimeout(this.touchDragState?.timer);
+            document.removeEventListener('touchmove', onTouchMove);
+            document.removeEventListener('touchend', onTouchEnd);
+        };
+        document.addEventListener('touchend', onTouchEnd, { once: true });
+    }
+
+    /**
+     * タッチドラッグを開始
+     */
+    startTouchDrag(card, x, y) {
+        this.draggedData = {
+            type: 'new',
+            module: card.dataset.module,
+            class: card.dataset.class,
+            container: card.dataset.container,
+            title: card.dataset.title
+        };
+
+        card.classList.add('dragging');
+        this.isTouchDragging = true;
+        this.dropZones.classList.add('active');
+        this.highlightPanelDropZones(true);
+        this.updateDropZoneHighlight(x, y);
+    }
+
+    /**
+     * タッチドラッグ終了
+     */
+    onTouchDragEnd(e) {
+        if (!this.touchDragState) return;
+
+        clearTimeout(this.touchDragState.timer);
+        this.touchDragState = null;
     }
 
     updateDrawerVisibility() {
@@ -800,6 +1348,7 @@ class TreeLayoutManager {
             }
         };
 
+        // マウスイベント
         menuBtn.addEventListener('mousedown', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -810,6 +1359,49 @@ class TreeLayoutManager {
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
         });
+
+        // タッチイベント
+        menuBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const touch = e.touches[0];
+            isDragging = false;
+            startX = touch.clientX;
+            startY = touch.clientY;
+
+            let touchMoved = false;
+
+            const onTouchMove = (e) => {
+                if (isDragging) return;
+                const touch = e.touches[0];
+                const dx = Math.abs(touch.clientX - startX);
+                const dy = Math.abs(touch.clientY - startY);
+
+                if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+                    touchMoved = true;
+                    isDragging = true;
+                    this.startLiftDrag(panelId, moduleInfo);
+                    this.isTouchDragging = true;
+                }
+            };
+
+            const onTouchEnd = (e) => {
+                document.removeEventListener('touchmove', onTouchMove);
+                document.removeEventListener('touchend', onTouchEnd);
+
+                if (!touchMoved && !isDragging) {
+                    // タップでメニュー開閉
+                    if (this.activeMenu && this.activeMenu !== panelMenu) {
+                        this.activeMenu.classList.remove('open');
+                    }
+                    panelMenu.classList.toggle('open');
+                    this.activeMenu = panelMenu.classList.contains('open') ? panelMenu : null;
+                }
+            };
+
+            document.addEventListener('touchmove', onTouchMove, { passive: false });
+            document.addEventListener('touchend', onTouchEnd);
+        }, { passive: false });
     }
 
     startLiftDrag(panelId, moduleInfo) {
@@ -949,30 +1541,45 @@ class TreeLayoutManager {
         const splitter = document.createElement('div');
         splitter.className = `splitter ${direction}`;
 
+        // マウスイベント
         splitter.addEventListener('mousedown', (e) => {
             e.preventDefault();
-            const prev = splitter.previousElementSibling;
-            const next = splitter.nextElementSibling;
-
-            if (!prev || !next) return;
-
-            this.activeSplitter = {
-                element: splitter,
-                direction,
-                startX: e.clientX,
-                startY: e.clientY,
-                prev,
-                next,
-                prevRect: prev.getBoundingClientRect(),
-                nextRect: next.getBoundingClientRect()
-            };
-
-            splitter.classList.add('active');
-            document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize';
-            document.body.style.userSelect = 'none';
+            this.startSplitterDrag(splitter, direction, e.clientX, e.clientY);
         });
 
+        // タッチイベント
+        splitter.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            this.startSplitterDrag(splitter, direction, touch.clientX, touch.clientY);
+        }, { passive: false });
+
         return splitter;
+    }
+
+    /**
+     * スプリッタードラッグ開始（共通処理）
+     */
+    startSplitterDrag(splitter, direction, clientX, clientY) {
+        const prev = splitter.previousElementSibling;
+        const next = splitter.nextElementSibling;
+
+        if (!prev || !next) return;
+
+        this.activeSplitter = {
+            element: splitter,
+            direction,
+            startX: clientX,
+            startY: clientY,
+            prev,
+            next,
+            prevRect: prev.getBoundingClientRect(),
+            nextRect: next.getBoundingClientRect()
+        };
+
+        splitter.classList.add('active');
+        document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize';
+        document.body.style.userSelect = 'none';
     }
 
     onSplitterDrag(e) {
@@ -980,24 +1587,45 @@ class TreeLayoutManager {
 
         const { direction, startX, startY, prev, next, prevRect, nextRect } = this.activeSplitter;
 
+        // ワークスペースの境界を取得
+        const workspaceRect = this.workspace.getBoundingClientRect();
+
         if (direction === 'horizontal') {
             const dx = e.clientX - startX;
-            const newPrevWidth = Math.max(100, prevRect.width + dx);
-            const newNextWidth = Math.max(100, nextRect.width - dx);
+            // 最小サイズ制約を適用
+            let newPrevWidth = Math.max(this.MIN_PANEL_WIDTH, prevRect.width + dx);
+            let newNextWidth = Math.max(this.MIN_PANEL_WIDTH, nextRect.width - dx);
 
-            prev.style.flex = 'none';
-            prev.style.width = newPrevWidth + 'px';
-            next.style.flex = 'none';
-            next.style.width = newNextWidth + 'px';
+            // 右端境界制限: 次のパネルが画面外に出ないよう制限
+            const maxPrevWidth = workspaceRect.width - this.MIN_PANEL_WIDTH - 10;
+            newPrevWidth = Math.min(newPrevWidth, maxPrevWidth);
+            newNextWidth = Math.max(this.MIN_PANEL_WIDTH, nextRect.width - (newPrevWidth - prevRect.width));
+
+            // 両方が最小サイズを満たす場合のみ適用
+            if (newPrevWidth >= this.MIN_PANEL_WIDTH && newNextWidth >= this.MIN_PANEL_WIDTH) {
+                prev.style.flex = 'none';
+                prev.style.width = newPrevWidth + 'px';
+                next.style.flex = 'none';
+                next.style.width = newNextWidth + 'px';
+            }
         } else {
             const dy = e.clientY - startY;
-            const newPrevHeight = Math.max(80, prevRect.height + dy);
-            const newNextHeight = Math.max(80, nextRect.height - dy);
+            // 最小サイズ制約を適用
+            let newPrevHeight = Math.max(this.MIN_PANEL_HEIGHT, prevRect.height + dy);
+            let newNextHeight = Math.max(this.MIN_PANEL_HEIGHT, nextRect.height - dy);
 
-            prev.style.flex = 'none';
-            prev.style.height = newPrevHeight + 'px';
-            next.style.flex = 'none';
-            next.style.height = newNextHeight + 'px';
+            // 下端境界制限: 次のパネルが画面外に出ないよう制限
+            const maxPrevHeight = workspaceRect.height - this.MIN_PANEL_HEIGHT - 10;
+            newPrevHeight = Math.min(newPrevHeight, maxPrevHeight);
+            newNextHeight = Math.max(this.MIN_PANEL_HEIGHT, nextRect.height - (newPrevHeight - prevRect.height));
+
+            // 両方が最小サイズを満たす場合のみ適用
+            if (newPrevHeight >= this.MIN_PANEL_HEIGHT && newNextHeight >= this.MIN_PANEL_HEIGHT) {
+                prev.style.flex = 'none';
+                prev.style.height = newPrevHeight + 'px';
+                next.style.flex = 'none';
+                next.style.height = newNextHeight + 'px';
+            }
         }
     }
 
@@ -1010,7 +1638,13 @@ class TreeLayoutManager {
             this.saveLayout();
         }
     }
+    // ========================================
+    // DOMスナップショット方式 レイアウト保存・復元
+    // ========================================
 
+    /**
+     * レイアウトを保存（DOMスナップショット方式）
+     */
     saveLayout() {
         const serialize = (element) => {
             if (!element) return null;
@@ -1018,26 +1652,38 @@ class TreeLayoutManager {
             if (element.classList.contains('module-panel')) {
                 const data = this.panels.get(element.id);
                 if (!data) return null;
+
+                const rect = element.getBoundingClientRect();
                 return {
                     type: 'panel',
                     module: data.moduleInfo.module,
                     class: data.moduleInfo.class,
                     container: data.moduleInfo.container,
                     title: data.moduleInfo.title,
-                    width: element.style.width || '',
-                    height: element.style.height || ''
+                    width: Math.round(rect.width),
+                    height: Math.round(rect.height)
                 };
             } else if (element.classList.contains('split-container')) {
+                const direction = element.classList.contains('vertical') ? 'vertical' : 'horizontal';
                 const children = [];
+
                 for (const child of element.children) {
-                    if (!child.classList.contains('splitter')) {
-                        const serialized = serialize(child);
-                        if (serialized) children.push(serialized);
+                    if (child.classList.contains('splitter')) continue;
+
+                    const serialized = serialize(child);
+                    if (serialized) {
+                        const childRect = child.getBoundingClientRect();
+                        // 分割方向に応じたサイズを保存
+                        serialized.size = direction === 'horizontal'
+                            ? Math.round(childRect.width)
+                            : Math.round(childRect.height);
+                        children.push(serialized);
                     }
                 }
+
                 return {
                     type: 'split',
-                    direction: element.classList.contains('vertical') ? 'vertical' : 'horizontal',
+                    direction,
                     children
                 };
             }
@@ -1045,55 +1691,211 @@ class TreeLayoutManager {
         };
 
         const root = this.layoutRoot.firstElementChild;
-        const layout = root ? serialize(root) : null;
-        localStorage.setItem('suiren-layout-v9', JSON.stringify(layout));
+        const layout = {
+            version: 12,
+            data: root ? serialize(root) : null
+        };
+
+        console.log('💾 Saving layout (v12):', JSON.stringify(layout, null, 2));
+        localStorage.setItem('suiren-layout-v12', JSON.stringify(layout));
     }
 
+    /**
+     * レイアウトを復元（DOMスナップショット方式）
+     */
     async restoreLayout() {
-        const saved = localStorage.getItem('suiren-layout-v9');
+        // v12を優先、古いバージョンは無視
+        const saved = localStorage.getItem('suiren-layout-v12');
         if (!saved) return;
 
         try {
             const layout = JSON.parse(saved);
-            if (layout) {
-                await this.restoreNode(layout, null);
+            console.log('📂 Restoring layout (v12):', layout);
+
+            if (layout?.data) {
+                // layoutRootをクリア
+                this.layoutRoot.innerHTML = '';
+                this.panels.clear();
+                this.moduleInWorkspace.clear();
+                this.panelIdCounter = 0;
+
+                // DOM構造を直接構築（この時点ではモジュールはロードしない）
+                const rootElement = await this.buildDOMFromSnapshot(layout.data);
+                if (rootElement) {
+                    // DOMに追加
+                    this.layoutRoot.appendChild(rootElement);
+                    this.workspaceEmpty.classList.add('hidden');
+                    this.updateDrawerVisibility();
+
+                    // ★DOMに追加後にモジュールをロード
+                    await this.loadModulesAfterRestore();
+
+                    // ★復元後にレイアウトを正規化
+                    setTimeout(() => this.normalizeLayout(), 100);
+                }
             }
         } catch (e) {
-            console.error('Layout restore failed:', e);
-            localStorage.removeItem('suiren-layout-v9');
+            console.error('❌ Layout restore failed:', e);
+            localStorage.removeItem('suiren-layout-v12');
         }
     }
 
-    async restoreNode(node, position) {
-        if (!node) return;
+    /**
+     * スナップショットからDOM構造を構築
+     */
+    async buildDOMFromSnapshot(node) {
+        if (!node) return null;
 
         if (node.type === 'panel') {
-            const pos = position || 'center';
-            await this.addPanel({
-                module: node.module,
-                class: node.class,
-                container: node.container,
-                title: node.title
-            }, null, pos);
+            return await this.createPanelFromSnapshot(node);
+        } else if (node.type === 'split') {
+            return await this.createSplitFromSnapshot(node);
+        }
+        return null;
+    }
 
-            const lastPanel = Array.from(this.panels.values()).pop();
-            if (lastPanel && node.width) {
-                lastPanel.element.style.width = node.width;
-                lastPanel.element.style.height = node.height;
-                lastPanel.element.style.flex = 'none';
-            }
-        } else if (node.type === 'split' && node.children?.length > 0) {
-            for (let i = 0; i < node.children.length; i++) {
-                const child = node.children[i];
-                let pos;
-                if (i === 0) {
-                    pos = 'center';
-                } else {
-                    pos = node.direction === 'horizontal' ? 'right' : 'bottom';
-                }
-                await this.restoreNode(child, pos);
+    /**
+     * スナップショットからパネル要素を作成
+     */
+    async createPanelFromSnapshot(panelNode) {
+        const panelId = `panel-${++this.panelIdCounter}`;
+        const template = this.panelTemplate.content.cloneNode(true);
+        const panel = template.querySelector('.module-panel');
+
+        panel.id = panelId;
+        panel.dataset.module = panelNode.module;
+
+        const panelTitle = panel.querySelector('.panel-title');
+        panelTitle.textContent = panelNode.title;
+
+        const panelContent = panel.querySelector('.panel-content');
+        const menuBtn = panel.querySelector('.panel-menu-btn');
+        const panelMenu = panel.querySelector('.panel-menu');
+        const deleteBtn = panel.querySelector('.delete-item');
+
+        // ★重要: panelContentにIDを設定（モジュールがこのIDを参照する）
+        panelContent.id = panelNode.container;
+
+        // ドロップゾーンイベント
+        const panelDropZones = panel.querySelectorAll('.panel-drop-zone');
+        panelDropZones.forEach(zone => {
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                zone.classList.add('highlight');
+            });
+            zone.addEventListener('dragleave', (e) => {
+                e.stopPropagation();
+                zone.classList.remove('highlight');
+            });
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleDrop(panelId, zone.dataset.zone);
+            });
+        });
+
+        const moduleInfo = {
+            module: panelNode.module,
+            class: panelNode.class,
+            container: panelNode.container,
+            title: panelNode.title
+        };
+
+        this.setupMenuButton(menuBtn, panelMenu, panelId, moduleInfo);
+
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            panelMenu.classList.remove('open');
+            this.activeMenu = null;
+            this.returnToDrawer(panelId);
+        });
+
+        // パネルデータを先に登録
+        this.panels.set(panelId, {
+            element: panel,
+            instance: null, // インスタンスは後でロード
+            moduleInfo
+        });
+
+        this.moduleInWorkspace.add(panelNode.module);
+
+        // サイズを適用
+        if (panelNode.width && panelNode.width > this.MIN_PANEL_WIDTH) {
+            panel.style.width = panelNode.width + 'px';
+            panel.style.flex = 'none';
+        }
+        if (panelNode.height && panelNode.height > this.MIN_PANEL_HEIGHT) {
+            panel.style.height = panelNode.height + 'px';
+            panel.style.flex = 'none';
+        }
+
+        return panel;
+    }
+
+    /**
+     * 復元後にモジュールをロード
+     */
+    async loadModulesAfterRestore() {
+        for (const [panelId, panelData] of this.panels) {
+            if (panelData.instance) continue; // 既にロード済み
+
+            const panelContent = panelData.element.querySelector('.panel-content');
+            if (!panelContent) continue;
+
+            try {
+                const instance = await this.app.loadModuleIntoPanel(
+                    panelData.moduleInfo.module,
+                    panelData.moduleInfo.class,
+                    panelData.moduleInfo.container,
+                    panelContent
+                );
+                panelData.instance = instance;
+            } catch (e) {
+                console.error(`Module load error for ${panelData.moduleInfo.module}:`, e);
             }
         }
+    }
+
+    /**
+     * スナップショットからsplit-container要素を作成
+     */
+    async createSplitFromSnapshot(splitNode) {
+        const { direction, children } = splitNode;
+
+        if (!children || children.length === 0) return null;
+
+        const container = document.createElement('div');
+        container.className = `split-container ${direction}`;
+
+        for (let i = 0; i < children.length; i++) {
+            const childNode = children[i];
+
+            // 子要素を構築
+            const childElement = await this.buildDOMFromSnapshot(childNode);
+            if (!childElement) continue;
+
+            // サイズを適用
+            if (childNode.size) {
+                if (direction === 'horizontal') {
+                    childElement.style.width = childNode.size + 'px';
+                    childElement.style.flex = 'none';
+                } else {
+                    childElement.style.height = childNode.size + 'px';
+                    childElement.style.flex = 'none';
+                }
+            }
+
+            container.appendChild(childElement);
+
+            // 最後の要素以外にスプリッターを追加
+            if (i < children.length - 1) {
+                const splitter = this.createSplitter(direction);
+                container.appendChild(splitter);
+            }
+        }
+
+        return container;
     }
 }
 
@@ -1112,6 +1914,8 @@ class AppController {
             document.getElementById('moduleDrawer')?.classList.toggle('expanded');
         });
         this.layoutManager = new TreeLayoutManager(this);
+        // プリセットシステム用にグローバル参照を設定
+        window.layoutManager = this.layoutManager;
     }
 
     async loadModuleIntoPanel(moduleName, className, originalContainerId, panelContentElement) {
