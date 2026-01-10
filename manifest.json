@@ -4,8 +4,8 @@
   "description": "Professional Audio Analysis & Tuning Suite",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#050505",
-  "theme_color": "#00bcd4",
+  "background_color": "#0a1214",
+  "theme_color": "#4ecdc4",
   "orientation": "any",
   "icons": [
     {
