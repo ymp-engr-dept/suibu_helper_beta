@@ -1,12 +1,12 @@
 // ▼▼▼ ここを更新するたびに書き換える（v1 -> v2 -> v3...） ▼▼▼
-const CACHE_NAME = 'suiren-audio-v0.3.6';
+const CACHE_NAME = 'suiren-audio-v0.4.0';
 // ▲▲▲ これが変わると、ブラウザは「更新がある」と判断します ▲▲▲
 
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './main.js',
-  './main.css',
+  './index.js',
+  './index.css',
   './ensemble-processor.js',
   './module/modules.json',
   './module/SpectrumAnalyzer/SpectrumAnalyzer.html',
@@ -14,7 +14,10 @@ const ASSETS_TO_CACHE = [
   './module/SpectrumAnalyzer/SpectrumAnalyzer.css',
   './module/Tuner/Tuner.html',
   './module/Tuner/Tuner.js',
-  './module/Tuner/Tuner.css'
+  './module/Tuner/Tuner.css',
+  './module/Metronome/Metronome.html',
+  './module/Metronome/Metronome.js',
+  './module/Metronome/Metronome.css'
 ];
 
 self.addEventListener('install', (event) => {
