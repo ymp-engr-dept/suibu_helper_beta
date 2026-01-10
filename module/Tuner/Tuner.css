@@ -1,15 +1,9 @@
-:root {
-  --bg-color: #0d0d0d;
-  --panel-bg: #141414;
-  --text-main: #fff;
-  --text-sub: #888;
-  --accent-ok: #00e676;
-  --accent-warn: #ffeb3b;
-  --accent-err: #ff1744;
-  --grid-line: #444;
-  --badge-bg: #222;
-  --badge-active: #00bcd4;
-}
+/* ==========================================
+   TUNER MODULE - Suiren Design System
+   ========================================== */
+
+/* CSS変数はグローバルで定義済み（index.css） */
+/* このモジュール専用のオーバーライド */
 
 /* --- Module Container --- */
 #tuner-app {
@@ -17,7 +11,7 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: var(--bg-color);
+  background: var(--bg-deepest, #0a1214);
   position: relative;
   overflow: hidden;
 }
@@ -25,15 +19,15 @@
 /* --- Upper Section --- */
 .upper-section {
   flex: 0 0 auto;
-  min-height: 180px;
+  min-height: 160px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: var(--panel-bg);
-  border-bottom: 1px solid #333;
+  background: var(--bg-panel, #1a2426);
+  border-bottom: 1px solid var(--border-subtle, #2a3638);
   position: relative;
-  padding: 20px;
+  padding: 16px 20px;
   box-sizing: border-box;
 }
 
@@ -42,53 +36,79 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0;
+  gap: 4px;
 }
 
 @media (min-width: 600px) {
   .tuner-readout {
     flex-direction: row;
     align-items: baseline;
-    gap: 20px;
+    gap: 16px;
   }
 }
 
 .note-display {
-  font-size: 5rem;
-  font-weight: 800;
-  color: #ffffff;
+  font-family: var(--font-display, 'Outfit', sans-serif);
+  font-size: 4.5rem;
+  font-weight: 700;
+  color: var(--text-primary, #e8edef);
   line-height: 1;
-  text-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-  transition: color 0.1s;
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  transition: color 0.15s ease-out, text-shadow 0.15s ease-out;
   white-space: nowrap;
   display: flex;
   align-items: flex-start;
+  letter-spacing: -0.02em;
 }
 
+/* わずかにズレ: 黄色 */
 .note-display.active {
-  color: var(--accent-warn);
-  text-shadow: 0 0 30px rgba(255, 235, 59, 0.6);
+  color: var(--status-warn, #ffb347);
+  text-shadow: 0 0 40px rgba(255, 179, 71, 0.5);
 }
 
+/* 正確: シアン */
 .note-display.perfect {
-  color: var(--accent-ok);
-  text-shadow: 0 0 50px rgba(0, 230, 118, 0.6);
+  color: var(--status-ok, #00e5cc);
+  text-shadow: 0 0 50px rgba(0, 229, 204, 0.6);
+}
+
+/* 大きくズレ: 赤 */
+.note-display.error {
+  color: var(--status-error, #ff6b6b);
+  text-shadow: 0 0 40px rgba(255, 107, 107, 0.5);
 }
 
 .octave {
-  font-size: 2rem;
-  color: var(--text-sub);
-  margin-left: 5px;
-  margin-top: 10px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 1.8rem;
+  font-weight: 500;
+  color: var(--text-secondary, #8a9a9e);
+  margin-left: 4px;
+  margin-top: 8px;
 }
 
 .cents-display {
-  font-family: 'Courier New', monospace;
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: var(--text-sub);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: var(--text-secondary, #8a9a9e);
   min-width: 80px;
   text-align: center;
+  transition: color 0.15s ease-out;
+}
+
+/* セント表示の色分け */
+.cents-display.ok {
+  color: var(--status-ok, #00e5cc);
+}
+
+.cents-display.warn {
+  color: var(--status-warn, #ffb347);
+}
+
+.cents-display.error {
+  color: var(--status-error, #ff6b6b);
 }
 
 @media (min-width: 600px) {
@@ -97,37 +117,39 @@
   }
 }
 
-/* Badges */
+/* Status Badges */
 .status-badges {
-  margin-top: 15px;
+  margin-top: 12px;
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .badge {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
   font-size: 0.6rem;
-  padding: 3px 6px;
-  border-radius: 3px;
-  background: var(--badge-bg);
-  color: #555;
-  border: 1px solid #333;
-  transition: all 0.2s;
-  font-weight: bold;
-  letter-spacing: 1px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--bg-elevated, #222e30);
+  color: var(--text-muted, #5a6a6e);
+  border: 1px solid var(--border-subtle, #2a3638);
+  transition: all 0.2s ease-out;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .badge.active {
-  background: var(--badge-active);
-  color: #000;
-  border-color: var(--badge-active);
-  box-shadow: 0 0 10px rgba(0, 188, 212, 0.6);
+  background: var(--accent-primary, #4ecdc4);
+  color: var(--bg-deepest, #0a1214);
+  border-color: var(--accent-primary, #4ecdc4);
+  box-shadow: 0 0 12px rgba(78, 205, 196, 0.4);
 }
 
 /* --- Lower Section (Graph) --- */
 .lower-section {
   flex: 1;
   position: relative;
-  background: #000;
+  background: var(--bg-deepest, #0a1214);
   overflow: hidden;
   width: 100%;
 }
