@@ -596,11 +596,41 @@ class GlobalAudioManager {
             this.presetEls.nameInput.value = '';
         });
 
-        // リストボタン（トグル）
+        // リストボタン（トグル）- 位置を計算して表示
         this.presetEls.listBtn?.addEventListener('click', (e) => {
             e.stopPropagation();
-            this.presetEls.list?.classList.toggle('open');
-            this.renderPresetList();
+
+            const list = this.presetEls.list;
+            const btn = this.presetEls.listBtn;
+
+            if (!list || !btn) return;
+
+            const isOpen = list.classList.contains('open');
+
+            if (!isOpen) {
+                // ボタンの位置を取得して、リストの表示位置を計算
+                const btnRect = btn.getBoundingClientRect();
+                const listWidth = 220; // min-width
+
+                // 右端がはみ出さないように調整
+                let left = btnRect.right - listWidth;
+                if (left < 10) left = 10;
+
+                // 下端がはみ出さないように調整
+                let top = btnRect.bottom + 4;
+                const maxHeight = 300;
+                if (top + maxHeight > window.innerHeight - 10) {
+                    // 上に表示
+                    top = Math.max(10, btnRect.top - maxHeight - 4);
+                }
+
+                list.style.left = left + 'px';
+                list.style.top = top + 'px';
+                list.classList.add('open');
+                this.renderPresetList();
+            } else {
+                list.classList.remove('open');
+            }
         });
 
         // リスト外クリックで閉じる
@@ -780,7 +810,7 @@ class TreeLayoutManager {
         this.MIN_PANEL_HEIGHT = 120;
 
         this.drawer = document.getElementById('moduleDrawer');
-        this.drawerToggle = document.getElementById('drawerToggle');
+        this.menuToggle = document.getElementById('menuToggle');
         this.moduleList = document.getElementById('moduleList');
         this.workspace = document.getElementById('workspace');
         this.layoutRoot = document.getElementById('layoutRoot');
@@ -803,20 +833,10 @@ class TreeLayoutManager {
     }
 
     async init() {
-        // ドロワー3段階制御: 閉→アイコン→展開→閉
-        this.drawerToggle?.addEventListener('click', () => {
-            if (this.drawer.classList.contains('expanded')) {
-                // 展開 → 完全閉鎖
-                this.drawer.classList.remove('expanded');
-                this.drawer.classList.remove('icons-only');
-            } else if (this.drawer.classList.contains('icons-only')) {
-                // アイコン → 展開
-                this.drawer.classList.remove('icons-only');
-                this.drawer.classList.add('expanded');
-            } else {
-                // 完全閉鎖 → アイコン
-                this.drawer.classList.add('icons-only');
-            }
+        // ドロワー開閉ボタン（グローバルオーディオパネル内）
+        this.drawerOpenBtn = document.getElementById('drawerOpenBtn');
+        this.drawerOpenBtn?.addEventListener('click', () => {
+            this.toggleDrawer();
         });
 
         // modules.jsonを読み込んでモジュールカードを動的生成
@@ -1084,8 +1104,20 @@ class TreeLayoutManager {
 
         card.classList.add('dragging');
         this.isTouchDragging = true;
+
+        // ドロワーを非表示（ドラッグ中）
+        this.drawer?.classList.add('hide-on-drag');
+
         this.dropZones.classList.add('active');
+
+        // ワークスペースにパネルがある場合はセンターゾーンを非表示
+        const centerZone = this.dropZones.querySelector('.zone-center');
+        if (centerZone) {
+            centerZone.style.display = this.panels.size > 0 ? 'none' : '';
+        }
+
         this.highlightPanelDropZones(true);
+        this.setupSplitterDropTargets(true);
         this.updateDropZoneHighlight(x, y);
     }
 
@@ -1097,6 +1129,31 @@ class TreeLayoutManager {
 
         clearTimeout(this.touchDragState.timer);
         this.touchDragState = null;
+    }
+
+    /**
+     * ドロワーの開閉を切り替え
+     */
+    toggleDrawer() {
+        const isOpen = this.drawer.classList.contains('expanded');
+
+        if (isOpen) {
+            // 閉じる
+            this.drawer.classList.remove('expanded');
+            this.drawerOpenBtn?.classList.remove('open');
+        } else {
+            // 開く
+            this.drawer.classList.add('expanded');
+            this.drawerOpenBtn?.classList.add('open');
+        }
+    }
+
+    /**
+     * ドロワーを閉じる
+     */
+    closeDrawer() {
+        this.drawer.classList.remove('expanded');
+        this.drawerOpenBtn?.classList.remove('open');
     }
 
     updateDrawerVisibility() {
@@ -1150,15 +1207,37 @@ class TreeLayoutManager {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', card.dataset.module);
 
+        // ドロワーを非表示（ドラッグ中）
+        this.drawer?.classList.add('hide-on-drag');
+
+        // ドロップゾーンを表示
         this.dropZones.classList.add('active');
+
+        // ワークスペースにパネルがある場合はセンターゾーンを非表示
+        const centerZone = this.dropZones.querySelector('.zone-center');
+        if (centerZone) {
+            centerZone.style.display = this.panels.size > 0 ? 'none' : '';
+        }
+
         this.highlightPanelDropZones(true);
+        this.setupSplitterDropTargets(true);
     }
 
     onDragEnd() {
         document.querySelectorAll('.module-card, .module-panel').forEach(c => c.classList.remove('dragging'));
         document.querySelectorAll('.drop-zone, .panel-drop-zone').forEach(z => z.classList.remove('highlight'));
+        document.querySelectorAll('.splitter').forEach(s => s.classList.remove('drop-target'));
         this.dropZones.classList.remove('active');
         this.highlightPanelDropZones(false);
+        this.setupSplitterDropTargets(false);
+
+        // センターゾーンを再表示
+        const centerZone = this.dropZones.querySelector('.zone-center');
+        if (centerZone) centerZone.style.display = '';
+
+        // ドロワーを再表示
+        this.drawer?.classList.remove('hide-on-drag');
+
         this.draggedData = null;
     }
 
@@ -1182,12 +1261,31 @@ class TreeLayoutManager {
     }
 
     updateDropZoneHighlight(x, y) {
+        // 既存のハイライトをすべてクリア
         document.querySelectorAll('.drop-zone, .panel-drop-zone').forEach(z => z.classList.remove('highlight'));
+        document.querySelectorAll('.splitter').forEach(s => s.classList.remove('drop-target'));
         this.currentHoverZone = null;
         this.currentHoverPanelZone = null;
+        this.currentHoverSplitter = null;
 
+        // 1. スプリッターをチェック（最優先）
+        const splitters = this.layoutRoot.querySelectorAll('.splitter');
+        for (const splitter of splitters) {
+            const rect = splitter.getBoundingClientRect();
+            // スプリッターの検出範囲を広げる（周囲20px）
+            const padding = 20;
+            if (x >= rect.left - padding && x <= rect.right + padding &&
+                y >= rect.top - padding && y <= rect.bottom + padding) {
+                splitter.classList.add('drop-target');
+                this.currentHoverSplitter = { element: splitter };
+                return;
+            }
+        }
+
+        // 2. ワークスペースのエッジゾーンをチェック
         const workspaceZones = this.dropZones.querySelectorAll('.drop-zone');
         for (const zone of workspaceZones) {
+            if (zone.style.display === 'none') continue;
             const rect = zone.getBoundingClientRect();
             if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
                 zone.classList.add('highlight');
@@ -1196,7 +1294,11 @@ class TreeLayoutManager {
             }
         }
 
+        // 3. パネルのドロップゾーンをチェック（移動時は自分自身を除外）
         for (const [panelId, panelData] of this.panels) {
+            // 自分自身（ドラッグ中のパネル）は除外
+            if (this.draggedData?.sourcePanelId === panelId) continue;
+
             const panelZones = panelData.element.querySelectorAll('.panel-drop-zone');
             for (const zone of panelZones) {
                 const rect = zone.getBoundingClientRect();
@@ -1214,41 +1316,81 @@ class TreeLayoutManager {
 
         this.isLiftDragging = false;
         document.body.style.cursor = '';
+
+        // すべてのハイライトをクリア
         document.querySelectorAll('.drop-zone, .panel-drop-zone').forEach(z => z.classList.remove('highlight'));
+        document.querySelectorAll('.splitter').forEach(s => s.classList.remove('drop-target'));
         this.dropZones.classList.remove('active');
         this.highlightPanelDropZones(false);
+        this.setupSplitterDropTargets(false);
+
+        // center zoneを再表示
+        const centerZone = this.dropZones.querySelector('.zone-center');
+        if (centerZone) centerZone.style.display = '';
+
+        // ドロワーを再表示
+        this.drawer?.classList.remove('hide-on-drag');
+
+        // ドラッグ中のパネルのスタイルを確実に戻す
+        if (data?.sourcePanelId) {
+            const sourcePanel = this.panels.get(data.sourcePanelId);
+            if (sourcePanel) {
+                sourcePanel.element.classList.remove('dragging');
+            }
+        }
 
         if (!data) {
             this.draggedData = null;
+            this.currentHoverZone = null;
+            this.currentHoverPanelZone = null;
+            this.currentHoverSplitter = null;
             return;
         }
 
         let targetPanelId = null;
         let position = 'center';
+        let splitterTarget = null;
 
-        if (this.currentHoverPanelZone) {
+        if (this.currentHoverSplitter) {
+            // スプリッターへのドロップ
+            splitterTarget = this.currentHoverSplitter.element;
+        } else if (this.currentHoverPanelZone) {
             targetPanelId = this.currentHoverPanelZone.panelId;
             position = this.currentHoverPanelZone.zone;
         } else if (this.currentHoverZone) {
             position = this.currentHoverZone.zone;
         } else {
-            this.moduleInWorkspace.delete(data.module);
-            this.updateDrawerVisibility();
+            // ドロップ先がない場合は移動をキャンセル（元の位置に戻す）
             this.draggedData = null;
             this.currentHoverZone = null;
             this.currentHoverPanelZone = null;
+            this.currentHoverSplitter = null;
             this.saveLayout();
             return;
+        }
+
+        // 移動の場合は元のパネルを削除して新しい位置に追加
+        if (data.type === 'move' && data.sourcePanelId) {
+            this.removePanelFromLayout(data.sourcePanelId, true);
         }
 
         this.draggedData = null;
         this.currentHoverZone = null;
         this.currentHoverPanelZone = null;
+        this.currentHoverSplitter = null;
 
-        this.addPanel(data, targetPanelId, position);
+        if (splitterTarget) {
+            // スプリッターへのドロップ処理
+            this.addPanelAtSplitter(data, splitterTarget);
+        } else {
+            this.addPanel(data, targetPanelId, position);
+        }
     }
 
-    async addPanel(moduleInfo, targetPanelId, position) {
+    /**
+     * スプリッターの位置にパネルを追加
+     */
+    async addPanelAtSplitter(moduleInfo, splitter) {
         const panelId = `panel-${++this.panelIdCounter}`;
 
         const template = this.panelTemplate.content.cloneNode(true);
@@ -1263,7 +1405,171 @@ class TreeLayoutManager {
         const menuBtn = panel.querySelector('.panel-menu-btn');
         const panelMenu = panel.querySelector('.panel-menu');
         const deleteBtn = panel.querySelector('.delete-item');
+        const dragHandle = panel.querySelector('.panel-drag-handle');
 
+        // ドラッグハンドルのイベント設定
+        this.setupDragHandle(dragHandle, panelId, moduleInfo);
+
+        // パネルドロップゾーンの設定
+        this.setupPanelDropZones(panel, panelId);
+
+        // メニューボタンの設定
+        this.setupMenuButton(menuBtn, panelMenu, panelId, moduleInfo);
+
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            panelMenu.classList.remove('open');
+            this.activeMenu = null;
+            this.returnToDrawer(panelId);
+        });
+
+        // スプリッターの隣に挿入
+        const direction = splitter.classList.contains('horizontal') ? 'horizontal' : 'vertical';
+        const parent = splitter.parentElement;
+        const newSplitter = this.createSplitter(direction);
+
+        // スプリッターの後ろに新しいパネルを挿入
+        splitter.after(newSplitter);
+        newSplitter.after(panel);
+
+        this.workspaceEmpty.classList.add('hidden');
+        this.moduleInWorkspace.add(moduleInfo.module);
+        this.updateDrawerVisibility();
+
+        const instance = await this.app.loadModuleIntoPanel(
+            moduleInfo.module,
+            moduleInfo.class,
+            moduleInfo.container,
+            panelContent
+        );
+
+        this.panels.set(panelId, {
+            element: panel,
+            moduleInfo,
+            instance
+        });
+
+        this.saveLayout();
+    }
+
+    /**
+     * ドラッグハンドルのイベント設定
+     */
+    setupDragHandle(dragHandle, panelId, moduleInfo) {
+        if (!dragHandle) return;
+
+        let isDragging = false;
+        let startX, startY;
+        let longPressTimer = null;
+        const DRAG_THRESHOLD = 3; // より小さいしきい値で反応しやすく
+        const LONG_PRESS_DELAY = 200; // 長押し検出時間（ms）
+
+        const startDrag = () => {
+            if (isDragging) return;
+            isDragging = true;
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            this.startLiftDrag(panelId, moduleInfo);
+        };
+
+        const onMouseMove = (e) => {
+            if (isDragging) return;
+
+            const dx = Math.abs(e.clientX - startX);
+            const dy = Math.abs(e.clientY - startY);
+
+            if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+                startDrag();
+            }
+        };
+
+        const onMouseUp = () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        // マウスイベント
+        dragHandle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            isDragging = false;
+            startX = e.clientX;
+            startY = e.clientY;
+
+            // 長押しでもドラッグ開始
+            longPressTimer = setTimeout(startDrag, LONG_PRESS_DELAY);
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        // タッチイベント
+        dragHandle.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const touch = e.touches[0];
+            isDragging = false;
+            startX = touch.clientX;
+            startY = touch.clientY;
+
+            // 長押しでもドラッグ開始
+            longPressTimer = setTimeout(() => {
+                startDrag();
+                this.isTouchDragging = true;
+            }, LONG_PRESS_DELAY);
+
+            const onTouchMove = (e) => {
+                if (isDragging) {
+                    // ドラッグ中の位置更新
+                    const touch = e.touches[0];
+                    this.updateDropZoneHighlight(touch.clientX, touch.clientY);
+                    return;
+                }
+
+                const touch = e.touches[0];
+                const dx = Math.abs(touch.clientX - startX);
+                const dy = Math.abs(touch.clientY - startY);
+
+                if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+                    if (longPressTimer) {
+                        clearTimeout(longPressTimer);
+                        longPressTimer = null;
+                    }
+                    isDragging = true;
+                    this.startLiftDrag(panelId, moduleInfo);
+                    this.isTouchDragging = true;
+                }
+            };
+
+            const onTouchEnd = (e) => {
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+                document.removeEventListener('touchmove', onTouchMove);
+                document.removeEventListener('touchend', onTouchEnd);
+
+                // ドラッグ中だった場合はドロップ処理
+                if (isDragging && this.isLiftDragging) {
+                    this.onLiftDrop(e);
+                }
+            };
+
+            document.addEventListener('touchmove', onTouchMove, { passive: false });
+            document.addEventListener('touchend', onTouchEnd);
+        }, { passive: false });
+    }
+
+    /**
+     * パネルドロップゾーンの設定
+     */
+    setupPanelDropZones(panel, panelId) {
         const panelDropZones = panel.querySelectorAll('.panel-drop-zone');
         panelDropZones.forEach(zone => {
             zone.addEventListener('dragover', (e) => {
@@ -1281,6 +1587,30 @@ class TreeLayoutManager {
                 this.handleDrop(panelId, zone.dataset.zone);
             });
         });
+    }
+
+    async addPanel(moduleInfo, targetPanelId, position) {
+        const panelId = `panel-${++this.panelIdCounter}`;
+
+        const template = this.panelTemplate.content.cloneNode(true);
+        const panel = template.querySelector('.module-panel');
+        panel.id = panelId;
+        panel.dataset.module = moduleInfo.module;
+
+        const panelTitle = panel.querySelector('.panel-title');
+        panelTitle.textContent = moduleInfo.title;
+
+        const panelContent = panel.querySelector('.panel-content');
+        const menuBtn = panel.querySelector('.panel-menu-btn');
+        const panelMenu = panel.querySelector('.panel-menu');
+        const deleteBtn = panel.querySelector('.delete-item');
+        const dragHandle = panel.querySelector('.panel-drag-handle');
+
+        // ドラッグハンドルのイベント設定
+        this.setupDragHandle(dragHandle, panelId, moduleInfo);
+
+        // パネルドロップゾーンの設定
+        this.setupPanelDropZones(panel, panelId);
 
         this.setupMenuButton(menuBtn, panelMenu, panelId, moduleInfo);
 
@@ -1410,17 +1740,62 @@ class TreeLayoutManager {
 
         this.draggedData = {
             type: 'move',
+            sourcePanelId: panelId, // 移動元パネルIDを保存
             module: moduleInfo.module,
             class: moduleInfo.class,
             container: moduleInfo.container,
             title: moduleInfo.title
         };
 
+        // パネルをドラッグ中状態にする（削除はしない）
+        panelData.element.classList.add('dragging');
+
         this.isLiftDragging = true;
-        this.removePanelFromLayout(panelId, true);
+
+        // ドロワーを非表示（ドラッグ中）
+        this.drawer?.classList.add('hide-on-drag');
+
+        // ドロップゾーンを表示（エッジ + パネル内）
         this.dropZones.classList.add('active');
+
+        // ワークスペースにパネルが1つだけの場合はセンターゾーンも表示
+        // 複数ある場合はセンターを非表示
+        const centerZone = this.dropZones.querySelector('.zone-center');
+        if (centerZone) {
+            centerZone.style.display = this.panels.size > 1 ? 'none' : '';
+        }
+
+        // パネル内ドロップゾーンを有効化（自分以外）
         this.highlightPanelDropZones(true);
+
+        // スプリッターをドロップターゲットとして設定
+        this.setupSplitterDropTargets(true);
+
         document.body.style.cursor = 'grabbing';
+    }
+
+    /**
+     * エッジドロップゾーンを表示
+     */
+    showEdgeDropZones() {
+        this.dropZones.classList.add('active');
+        // center zoneは非表示
+        const centerZone = this.dropZones.querySelector('.zone-center');
+        if (centerZone) centerZone.style.display = 'none';
+    }
+
+    /**
+     * スプリッターをドロップターゲットとして設定
+     */
+    setupSplitterDropTargets(enable) {
+        const splitters = this.layoutRoot.querySelectorAll('.splitter');
+        splitters.forEach(splitter => {
+            if (enable) {
+                splitter.classList.add('drop-target-candidate');
+            } else {
+                splitter.classList.remove('drop-target-candidate', 'drop-target');
+            }
+        });
     }
 
     removePanelFromLayout(panelId, keepInWorkspace = false) {
@@ -1776,31 +2151,19 @@ class TreeLayoutManager {
         // ★重要: panelContentにIDを設定（モジュールがこのIDを参照する）
         panelContent.id = panelNode.container;
 
-        // ドロップゾーンイベント
-        const panelDropZones = panel.querySelectorAll('.panel-drop-zone');
-        panelDropZones.forEach(zone => {
-            zone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                zone.classList.add('highlight');
-            });
-            zone.addEventListener('dragleave', (e) => {
-                e.stopPropagation();
-                zone.classList.remove('highlight');
-            });
-            zone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.handleDrop(panelId, zone.dataset.zone);
-            });
-        });
-
         const moduleInfo = {
             module: panelNode.module,
             class: panelNode.class,
             container: panelNode.container,
             title: panelNode.title
         };
+
+        // ★ドラッグハンドルの設定（復元モジュールでも移動可能に）
+        const dragHandle = panel.querySelector('.panel-drag-handle');
+        this.setupDragHandle(dragHandle, panelId, moduleInfo);
+
+        // ★パネルドロップゾーンの設定
+        this.setupPanelDropZones(panel, panelId);
 
         this.setupMenuButton(menuBtn, panelMenu, panelId, moduleInfo);
 
