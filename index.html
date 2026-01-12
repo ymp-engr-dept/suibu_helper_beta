@@ -25,10 +25,10 @@
   <header class="app-header">
     <div class="header-left">
       <button class="drawer-trigger" id="menuToggle" aria-label="モジュールメニュー">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-          <rect y="3" width="20" height="2" rx="1" />
-          <rect y="9" width="20" height="2" rx="1" />
-          <rect y="15" width="20" height="2" rx="1" />
+        <svg class="menu-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <rect class="menu-line menu-line-1" y="3" width="20" height="2" rx="1" />
+          <rect class="menu-line menu-line-2" y="9" width="20" height="2" rx="1" />
+          <rect class="menu-line menu-line-3" y="15" width="20" height="2" rx="1" />
         </svg>
       </button>
       <div class="brand-logo">
@@ -54,6 +54,12 @@
   <!-- グローバルオーディオ設定パネル -->
   <div class="global-audio-panel" id="globalAudioPanel">
     <div class="audio-controls-row">
+      <!-- ドロワー開閉ボタン -->
+      <button class="drawer-open-btn" id="drawerOpenBtn" aria-label="モジュール追加">
+        <span class="drawer-open-icon">+</span>
+        <span class="drawer-open-label">追加</span>
+      </button>
+
       <!-- 入力設定セクション -->
       <section class="panel-section">
         <span class="section-label">INPUT</span>
@@ -156,11 +162,8 @@
   </div>
 
   <div class="app-body">
-    <!-- モジュールドロワー（完全閉鎖可能） -->
+    <!-- モジュールドロワー（オーバーレイ） -->
     <aside class="module-drawer" id="moduleDrawer">
-      <div class="drawer-toggle" id="drawerToggle">
-        <span class="toggle-icon">◀</span>
-      </div>
       <div class="drawer-content">
         <div class="drawer-header">Modules</div>
         <div class="module-list" id="moduleList">
@@ -182,11 +185,13 @@
 
       <!-- ドロップゾーンオーバーレイ -->
       <div class="drop-zones" id="dropZones">
+        <!-- ワークスペースが空の時の全体ドロップエリア -->
         <div class="drop-zone zone-center" data-zone="center"></div>
-        <div class="drop-zone zone-top" data-zone="top"></div>
-        <div class="drop-zone zone-bottom" data-zone="bottom"></div>
-        <div class="drop-zone zone-left" data-zone="left"></div>
-        <div class="drop-zone zone-right" data-zone="right"></div>
+        <!-- エッジドロップゾーン（ライン表示） -->
+        <div class="drop-zone zone-edge zone-top" data-zone="top"></div>
+        <div class="drop-zone zone-edge zone-bottom" data-zone="bottom"></div>
+        <div class="drop-zone zone-edge zone-left" data-zone="left"></div>
+        <div class="drop-zone zone-edge zone-right" data-zone="right"></div>
       </div>
     </main>
   </div>
