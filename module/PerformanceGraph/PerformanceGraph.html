@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Graph Module</title>
+    <link rel="stylesheet" href="PerformanceGraph.css">
+</head>
+
+<body>
+
+    <div id="performance-graph-app">
+        <!-- グラフ表示エリア -->
+        <div class="graph-container">
+            <canvas id="performanceCanvas"></canvas>
+        </div>
+
+        <!-- 設定バー -->
+        <div class="settings-bar">
+            <div class="settings-group">
+                <label class="setting-item">
+                    <span class="setting-label">時間幅</span>
+                    <select id="timeScaleSelect" class="setting-select">
+                        <option value="5">5秒</option>
+                        <option value="10" selected>10秒</option>
+                        <option value="20">20秒</option>
+                        <option value="30">30秒</option>
+                    </select>
+                </label>
+            </div>
+
+            <!-- 凡例 -->
+            <div class="legend">
+                <div class="legend-item">
+                    <span class="legend-color volume"></span>
+                    <span class="legend-text">音量</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color pitch-ok"></span>
+                    <span class="legend-text">音程◎</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color pitch-warn"></span>
+                    <span class="legend-text">音程△</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="PerformanceGraph.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const performanceGraph = new PerformanceGraphModule('performance-graph-app');
+            performanceGraph.mount();
+        });
+    </script>
+</body>
+
+</html>
