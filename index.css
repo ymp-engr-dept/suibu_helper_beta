@@ -181,6 +181,25 @@ body {
     height: 20px;
 }
 
+/* メニューアイコンのアニメーション */
+.menu-line {
+    transition: all var(--transition-normal);
+    transform-origin: center;
+}
+
+.drawer-trigger.open .menu-line-1 {
+    transform: translateY(6px) rotate(45deg);
+}
+
+.drawer-trigger.open .menu-line-2 {
+    opacity: 0;
+    transform: scaleX(0);
+}
+
+.drawer-trigger.open .menu-line-3 {
+    transform: translateY(-6px) rotate(-45deg);
+}
+
 .brand-logo {
     display: flex;
     align-items: baseline;
@@ -339,6 +358,52 @@ body {
 
 .audio-controls-row::-webkit-scrollbar {
     display: none;
+}
+
+/* ドロワー開閉ボタン */
+.drawer-open-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--accent-primary);
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.drawer-open-btn:hover {
+    background: var(--accent-hover);
+    transform: scale(1.02);
+}
+
+.drawer-open-btn:active {
+    transform: scale(0.98);
+}
+
+.drawer-open-icon {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--bg-deepest);
+    line-height: 1;
+}
+
+.drawer-open-label {
+    font-family: var(--font-label);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--bg-deepest);
+    letter-spacing: 0.02em;
+}
+
+.drawer-open-btn.open {
+    background: var(--status-error);
+}
+
+.drawer-open-btn.open .drawer-open-icon {
+    transform: rotate(45deg);
 }
 
 /* パネルセクション */
@@ -775,17 +840,14 @@ body {
 
 .preset-list {
     display: none;
-    position: absolute;
-    top: 100%;
-    right: 0;
-    margin-top: var(--space-xs);
+    position: fixed;
     background: var(--bg-panel);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
-    min-width: 200px;
-    max-height: 240px;
+    min-width: 220px;
+    max-height: 300px;
     overflow-y: auto;
-    z-index: 200;
+    z-index: 9999;
     box-shadow: var(--shadow-lg);
 }
 
@@ -856,19 +918,22 @@ body {
     position: relative;
 }
 
-/* === Module Drawer === */
+/* === Module Drawer（オーバーレイ表示） === */
 .module-drawer {
-    width: var(--sidebar-width);
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 0;
     min-width: 0;
     background: var(--bg-deep);
     border-right: 1px solid var(--border-subtle);
     display: flex;
     flex-direction: column;
-    transition: width var(--transition-slow), min-width var(--transition-slow);
-    z-index: 50;
-    flex-shrink: 0;
-    position: relative;
+    transition: width var(--transition-slow), opacity var(--transition-fast);
+    z-index: 150;
     overflow: hidden;
+    box-shadow: var(--shadow-lg);
 }
 
 .module-drawer.icons-only {
@@ -879,6 +944,12 @@ body {
 .module-drawer.expanded {
     width: var(--sidebar-expanded);
     min-width: var(--sidebar-expanded);
+}
+
+/* ドラッグ中はドロワーを非表示 */
+.module-drawer.hide-on-drag {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .drawer-toggle {
@@ -896,7 +967,7 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    z-index: 51;
+    z-index: 151;
     transition: all var(--transition-fast);
 }
 
@@ -1066,48 +1137,80 @@ body {
     pointer-events: auto;
 }
 
-.drop-zone {
+/* ワークスペースが空の時の全体ドロップエリア */
+.drop-zone.zone-center {
     position: absolute;
     background: transparent;
     transition: all var(--transition-fast);
 }
 
-.drop-zone.highlight {
+.drop-zone.zone-center.highlight {
     background: var(--accent-glow-strong);
     border: 2px dashed var(--accent-primary);
-}
-
-.zone-center {
-    inset: 20% 20%;
     border-radius: var(--radius-lg);
 }
 
+/* エッジドロップゾーン（当たり判定は大きく、表示はライン） */
+.drop-zone.zone-edge {
+    position: absolute;
+    background: transparent;
+    transition: all var(--transition-fast);
+}
+
+.drop-zone.zone-edge.highlight {
+    background: linear-gradient(var(--accent-primary), var(--accent-primary));
+    box-shadow: 0 0 16px var(--accent-primary), 0 0 32px var(--accent-glow);
+}
+
+/* エッジゾーンのサイズ（当たり判定は大きく） */
 .zone-top {
     top: 0;
     left: 0;
     right: 0;
-    height: 20%;
+    height: 24px;
+}
+
+.zone-top.highlight {
+    height: 6px;
 }
 
 .zone-bottom {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 20%;
+    height: 24px;
+}
+
+.zone-bottom.highlight {
+    height: 6px;
 }
 
 .zone-left {
     top: 0;
     bottom: 0;
     left: 0;
-    width: 20%;
+    width: 24px;
+}
+
+.zone-left.highlight {
+    width: 6px;
 }
 
 .zone-right {
     top: 0;
     bottom: 0;
     right: 0;
-    width: 20%;
+    width: 24px;
+}
+
+.zone-right.highlight {
+    width: 6px;
+}
+
+/* ワークスペースが空の時のセンターゾーン */
+.zone-center {
+    inset: 5%;
+    border-radius: var(--radius-lg);
 }
 
 /* === Split Container === */
@@ -1130,7 +1233,7 @@ body {
 .splitter {
     background: var(--splitter-color);
     flex-shrink: 0;
-    transition: background var(--transition-fast);
+    transition: background var(--transition-fast), box-shadow var(--transition-fast);
     position: relative;
     z-index: 10;
 }
@@ -1138,6 +1241,13 @@ body {
 .splitter:hover,
 .splitter.active {
     background: var(--splitter-hover);
+}
+
+/* スプリッターがドロップターゲットの時 */
+.splitter.drop-target {
+    background: var(--accent-primary);
+    box-shadow: 0 0 16px var(--accent-primary);
+    z-index: 101;
 }
 
 .splitter.horizontal {
@@ -1162,6 +1272,14 @@ body {
     flex: 1;
     overflow: hidden;
     border-radius: var(--radius-sm);
+    transition: opacity var(--transition-normal), transform var(--transition-normal);
+}
+
+/* パネルがドラッグ中の時 */
+.module-panel.dragging {
+    opacity: 0.3;
+    transform: scale(0.98);
+    pointer-events: none;
 }
 
 .panel-header {
@@ -1322,35 +1440,53 @@ body {
 }
 
 .panel-drop-zone.highlight {
-    background: var(--accent-glow-strong);
+    background: var(--accent-primary);
+    box-shadow: 0 0 12px var(--accent-primary);
 }
 
+/* パネル内ドロップゾーン - 当たり判定は大きく、ハイライト時はライン表示 */
 .pdz-top {
     top: 0;
     left: 0;
     right: 0;
-    height: 30%;
+    height: 20px;
+}
+
+.pdz-top.highlight {
+    height: 6px;
 }
 
 .pdz-bottom {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 30%;
+    height: 20px;
+}
+
+.pdz-bottom.highlight {
+    height: 6px;
 }
 
 .pdz-left {
     top: 0;
     bottom: 0;
     left: 0;
-    width: 30%;
+    width: 20px;
+}
+
+.pdz-left.highlight {
+    width: 6px;
 }
 
 .pdz-right {
     top: 0;
     bottom: 0;
     right: 0;
-    width: 30%;
+    width: 20px;
+}
+
+.pdz-right.highlight {
+    width: 6px;
 }
 
 /* === Legacy header support (元のHTML用) === */
