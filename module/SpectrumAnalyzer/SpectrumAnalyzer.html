@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spectrum Analyzer Module</title>
+  <link rel="stylesheet" href="SpectrumAnalyzer.css" />
+</head>
+
+<body>
+
+  <div id="spectrum-analyzer-app">
+    <!-- キャンバスコンテナ（メインエリア） -->
+    <div class="canvas-container">
+      <canvas id="analyzerCanvas"></canvas>
+
+      <!-- オーバーレイコントロール -->
+      <div class="controls-overlay">
+        <div class="overlay-right">
+          <label class="checkbox-item">
+            <input type="checkbox" id="showHarmonicsCheckbox" checked>
+            <span>倍音表示</span>
+          </label>
+          <div class="separator"></div>
+          <button id="saveCompareBtn" class="btn-small" title="現在の波形を保存">比較保存</button>
+          <label class="checkbox-item">
+            <input type="checkbox" id="showCompareCheckbox">
+            <span>比較表示</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="SpectrumAnalyzer.js"></script>
+  <script>
+    // SPAでのマウントを想定した起動スクリプト
+    document.addEventListener('DOMContentLoaded', () => {
+      // クラスをインスタンス化して起動
+      const analyzer = new SpectrumAnalyzer('spectrum-analyzer-app');
+      analyzer.mount();
+    });
+  </script>
+</body>
+
+</html>

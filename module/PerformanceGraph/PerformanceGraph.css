@@ -1,0 +1,135 @@
+/* ==========================================
+   PERFORMANCE GRAPH MODULE - Suiren Design System
+   ========================================== */
+
+/* --- Module Container --- */
+#performance-graph-app {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-deepest, #0a1214);
+    position: relative;
+    overflow: hidden;
+}
+
+/* --- Graph Container --- */
+.graph-container {
+    flex: 1;
+    position: relative;
+    background: var(--bg-deepest, #0a1214);
+    overflow: hidden;
+    width: 100%;
+    min-height: 150px;
+}
+
+.graph-container canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* --- Settings Bar --- */
+.settings-bar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-panel, #1a2426);
+    border-top: 1px solid var(--border-subtle, #2a3638);
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.settings-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.setting-label {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 0.75rem;
+    color: var(--text-secondary, #8a9a9e);
+    white-space: nowrap;
+}
+
+.setting-select {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--bg-elevated, #222e30);
+    color: var(--text-primary, #e8edef);
+    border: 1px solid var(--border-subtle, #2a3638);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s ease-out;
+}
+
+.setting-select:hover,
+.setting-select:focus {
+    border-color: var(--accent-primary, #4ecdc4);
+}
+
+/* --- Legend --- */
+.legend {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+.legend-color.volume {
+    background: linear-gradient(to bottom,
+            rgba(78, 205, 196, 0.6) 0%,
+            rgba(78, 205, 196, 0.2) 50%,
+            rgba(78, 205, 196, 0.6) 100%);
+    border: 1px solid rgba(78, 205, 196, 0.8);
+}
+
+.legend-color.pitch-ok {
+    background: var(--status-ok, #00e5cc);
+}
+
+.legend-color.pitch-warn {
+    background: var(--status-error, #ff6b6b);
+}
+
+.legend-text {
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 0.65rem;
+    color: var(--text-muted, #5a6a6e);
+    letter-spacing: 0.02em;
+}
+
+/* --- Responsive --- */
+@media (max-width: 400px) {
+    .settings-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .legend {
+        flex-wrap: wrap;
+    }
+}
