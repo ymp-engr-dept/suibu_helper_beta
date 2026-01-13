@@ -1,9 +1,16 @@
 /**
  * GlobalAudioManager - オーディオシステム管理
  * 個人練モード（Solo）と合奏モード（Ensemble）をサポート
+ * 
+ * v2.0: AudioPipeline統合による超低遅延対応
  */
 class GlobalAudioManager {
     constructor() {
+        // === 新しい超低遅延パイプライン ===
+        this.pipeline = null;
+        this.usePipeline = true; // 新パイプラインを使用
+
+        // === 従来の互換性用 ===
         this.audioContext = null;
         this.analyser = null;
         this.micSource = null;
@@ -24,9 +31,9 @@ class GlobalAudioManager {
         this.ensembleGainNode = null;
         this.isEnsembleWorkletLoaded = false;
 
-        // フォールバック用のScriptProcessor（AudioWorklet非対応環境）
+        // ScriptProcessor廃止（AudioWorklet専用）
         this.ensembleScriptProcessor = null;
-        this.useWorklet = true; // AudioWorkletを使用するか
+        this.useWorklet = true;
 
         // 合奏モード用ノイズフィルタ状態
         this.ensembleState = {
@@ -114,6 +121,49 @@ class GlobalAudioManager {
     }
 
     async initAudio() {
+        // === 新しいAudioPipeline使用 ===
+        if (this.usePipeline && window.AudioPipeline) {
+            if (this.pipeline) return;
+
+            this.pipeline = new AudioPipeline();
+
+            // コールバック設定
+            this.pipeline.onStatusChange = (status, message) => {
+                this.updateStatusBadge(status, message);
+            };
+            this.pipeline.onError = (type, error) => {
+                console.error(`Audio ${type} error:`, error);
+                this.updateStatusBadge('error', `${type} Error`);
+            };
+
+            try {
+                await this.pipeline.initialize();
+                await this.pipeline.startMicInput();
+
+                // 互換性のためにanalyserとaudioContextを設定
+                this.analyser = this.pipeline.getAnalyser();
+                this.audioContext = this.pipeline.getAudioContext();
+                this.micStream = this.pipeline.micStream;
+
+                // レコーダー設定
+                if (this.micStream) {
+                    this.setupRecorder(this.micStream);
+                }
+
+                // ファイルソース設定
+                if (this.els.audioEngine) {
+                    this.pipeline.setFileSource(this.els.audioEngine);
+                }
+
+                this.isEnsembleWorkletLoaded = true;
+                return;
+            } catch (e) {
+                console.error('Pipeline init failed, falling back:', e);
+                this.usePipeline = false;
+            }
+        }
+
+        // === フォールバック: 従来方式 ===
         if (this.audioContext) return;
         const AC = window.AudioContext || window.webkitAudioContext;
         this.audioContext = new AC();
@@ -172,9 +222,9 @@ class GlobalAudioManager {
                 throw new Error('AudioWorklet not supported');
             }
         } catch (e) {
-            console.warn('AudioWorklet not available, using ScriptProcessor fallback:', e);
-            this.useWorklet = false;
-            this.setupScriptProcessorFallback();
+            // AudioWorklet非対応：エラーとして処理（ScriptProcessor廃止）
+            console.error('AudioWorklet not supported:', e);
+            throw new Error('AudioWorklet is required. Please use a modern browser.');
         }
     }
 
@@ -255,8 +305,14 @@ class GlobalAudioManager {
         if (mode !== 'solo' && mode !== 'ensemble') return;
 
         this.practiceMode = mode;
-        console.log(`Practice mode changed to: ${mode}`);
 
+        // === 新しいAudioPipeline使用 ===
+        if (this.usePipeline && this.pipeline) {
+            this.pipeline.setMode(mode);
+            return;
+        }
+
+        // === フォールバック: 従来方式 ===
         // AudioWorkletノードに通知
         if (this.ensembleWorkletNode) {
             this.ensembleWorkletNode.port.postMessage({
