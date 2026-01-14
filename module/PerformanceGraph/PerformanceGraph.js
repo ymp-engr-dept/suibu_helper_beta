@@ -507,13 +507,24 @@ class PerformanceGraphModule {
 
         if (!audioContext || !secondsPerBeat) return null;
 
-        const currentTime = audioContext.currentTime;
+        // AudioContext時刻を取得
+        const acCurrentTime = audioContext.currentTime;
         const nextNoteTime = metronome.nextNoteTime;
+
+        // performance.now()との同期を計算
+        // AudioContext.currentTimeは秒単位、performance.now()はミリ秒単位
+        const perfNow = performance.now();
+
+        // 同期補正用のオフセットを計算（初回のみ）
+        if (!this._audioContextTimeOffset) {
+            this._audioContextTimeOffset = acCurrentTime * 1000 - perfNow;
+        }
 
         return {
             secondsPerBeat,
-            currentTime,
+            currentTime: acCurrentTime,
             nextNoteTime,
+            perfTimeOffset: this._audioContextTimeOffset,
             isPlaying: true
         };
     }
@@ -543,7 +554,10 @@ class PerformanceGraphModule {
         ctx.rect(0, 0, w, h);
         ctx.clip();
 
-        const currentX = w * this.config.currentTimePosition;  // 現在位置のX座標（右側85%）
+        // === 描画時の現在時刻を使用（低電力モードでも滑らかにスクロール） ===
+        this._drawTimestamp = performance.now();
+
+        const currentX = w * this.config.currentTimePosition;  // 現在位置のX座標（左側15%）
         const centerY = h / 2;                                  // グラフの中央Y座標
 
         // グリッド線を描画
@@ -680,7 +694,8 @@ class PerformanceGraphModule {
     drawVolumeWaveform(ctx, w, h, currentX, centerY) {
         if (this.dataHistory.length < 2) return;
 
-        const now = this.lastTimestamp;
+        // 描画時の現在時刻を使用（低電力モードでも滑らかにスクロール）
+        const now = this._drawTimestamp || this.lastTimestamp;
         const displayMs = this.timeScale * 1000;  // 過去の表示範囲（ミリ秒）
         const pastWidth = w - currentX;  // 現在位置から右側の幅
         const pixelsPerMs = pastWidth / displayMs;
@@ -751,7 +766,8 @@ class PerformanceGraphModule {
     drawPitchLine(ctx, w, h, currentX, centerY) {
         if (this.dataHistory.length < 2) return;
 
-        const now = this.lastTimestamp;
+        // 描画時の現在時刻を使用（低電力モードでも滑らかにスクロール）
+        const now = this._drawTimestamp || this.lastTimestamp;
         const displayMs = this.timeScale * 1000;
         const pastWidth = w - currentX;
         const pixelsPerMs = pastWidth / displayMs;
@@ -836,7 +852,8 @@ class PerformanceGraphModule {
     drawNoteLabels(ctx, w, h, currentX, centerY) {
         if (this.dataHistory.length < 2) return;
 
-        const now = this.lastTimestamp;
+        // 描画時の現在時刻を使用（低電力モードでも滑らかにスクロール）
+        const now = this._drawTimestamp || this.lastTimestamp;
         const displayMs = this.timeScale * 1000;
         const pastWidth = w - currentX;
         const pixelsPerMs = pastWidth / displayMs;
