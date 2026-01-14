@@ -1,5 +1,5 @@
 // ▼▼▼ ここを更新するたびに書き換える（v1 -> v2 -> v3...） ▼▼▼
-const CACHE_NAME = 'suiren-audio-v0.17.0';
+const CACHE_NAME = 'suiren-audio-v0.18.0';
 // ▲▲▲ これが変わると、ブラウザは「更新がある」と判断します ▲▲▲
 
 const ASSETS_TO_CACHE = [
