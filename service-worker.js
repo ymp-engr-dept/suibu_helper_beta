@@ -1,5 +1,5 @@
 // ▼▼▼ ここを更新するたびに書き換える（v1 -> v2 -> v3...） ▼▼▼
-const CACHE_NAME = 'suiren-audio-v0.30.0';
+const CACHE_NAME = 'suiren-audio-v0.17.0';
 // ▲▲▲ これが変わると、ブラウザは「更新がある」と判断します ▲▲▲
 
 const ASSETS_TO_CACHE = [
@@ -12,6 +12,7 @@ const ASSETS_TO_CACHE = [
   './audio-core/passthrough-processor.js',
   './audio-core/preprocessor.js',
   './audio-core/PitchEngine.js',
+  './audio-core/PowerManager.js',
   './module/modules.json',
   './module/SpectrumAnalyzer/SpectrumAnalyzer.html',
   './module/SpectrumAnalyzer/SpectrumAnalyzer.js',
