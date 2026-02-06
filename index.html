@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Suiren Audio Suite</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4ecdc4">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@500;600;700&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+  <!-- ヘッダー -->
+  <header class="app-header">
+    <div class="header-left">
+      <button class="drawer-trigger" id="menuToggle" aria-label="モジュールメニュー">
+        <svg class="menu-icon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+          <rect class="menu-line menu-line-1" y="3" width="20" height="2" rx="1" />
+          <rect class="menu-line menu-line-2" y="9" width="20" height="2" rx="1" />
+          <rect class="menu-line menu-line-3" y="15" width="20" height="2" rx="1" />
+        </svg>
+      </button>
+      <div class="brand-logo">
+        <span class="brand-name">SUIREN</span>
+        <span class="brand-suffix">AUDIO</span>
+        <span class="brand-version" id="appVersion">v0.0.0</span>
+      </div>
+      <!-- ダウンロード進捗インジケーター -->
+      <div class="download-indicator" id="downloadIndicator">
+        <div class="download-spinner"></div>
+        <span class="download-text">準備中...</span>
+        <div class="download-progress-bar">
+          <div class="download-progress-fill" id="downloadProgressFill"></div>
+        </div>
+      </div>
+    </div>
+    <div class="header-center">
+      <div class="status-indicator" id="globalStatusBadge">
+        <span class="status-dot"></span>
+        <span class="status-text">タップして開始</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="mode-indicator" id="practiceModeIndicator">
+        <span class="mode-icon">👤</span>
+        <span class="mode-text">個人練</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- グローバルオーディオ設定パネル -->
+  <div class="global-audio-panel" id="globalAudioPanel">
+    <div class="audio-controls-row">
+      <!-- ドロワー開閉ボタン -->
+      <button class="drawer-open-btn" id="drawerOpenBtn" aria-label="モジュール追加">
+        <span class="drawer-open-icon">+</span>
+        <span class="drawer-open-label">追加</span>
+      </button>
+
+      <!-- 入力設定セクション -->
+      <section class="panel-section">
+        <span class="section-label">INPUT</span>
+        <div class="control-group">
+          <label class="control-item">
+            <span class="label-text">GAIN</span>
+            <input id="globalGainInput" type="number" value="1.0" min="0.1" max="10" step="0.1">
+          </label>
+          <label class="control-item">
+            <span class="label-text">A4</span>
+            <input id="globalA4Input" type="number" value="442" min="400" max="480" step="1">
+          </label>
+        </div>
+      </section>
+
+      <div class="panel-divider"></div>
+
+      <!-- 表記設定セクション -->
+      <section class="panel-section">
+        <span class="section-label">NOTE</span>
+        <div class="control-group">
+          <select id="globalNotationSelect">
+            <option value="C">English</option>
+            <option value="JP_C">日本語</option>
+            <option value="JP_Bb">B♭管</option>
+            <option value="JP_Eb">E♭管</option>
+            <option value="JP_F">F管</option>
+          </select>
+        </div>
+      </section>
+
+      <div class="panel-divider"></div>
+
+      <!-- 録音コントロールセクション -->
+      <section class="panel-section">
+        <span class="section-label">REC</span>
+        <div class="control-group button-group">
+          <button id="globalFreezeBtn" class="btn icon-btn" title="フリーズ">❄️</button>
+          <button id="globalRecordBtn" class="btn icon-btn record-btn" title="録音">⏺</button>
+          <label class="btn icon-btn file-btn" title="ファイル選択">
+            📁
+            <input type="file" id="globalFileInput" accept="audio/*" hidden>
+          </label>
+        </div>
+      </section>
+
+      <div class="panel-divider"></div>
+
+      <!-- モード切替セクション -->
+      <section class="panel-section">
+        <span class="section-label">MODE</span>
+        <div class="control-group mode-group">
+          <label class="mode-switch">
+            <input type="checkbox" id="globalSourceModeCheckbox">
+            <span class="slider"></span>
+            <span class="mode-label">File</span>
+          </label>
+        </div>
+        <div class="control-group mode-group">
+          <label class="practice-mode-switch" id="practiceModeSwitch">
+            <span class="practice-mode-label solo-label">個人</span>
+            <input type="checkbox" id="globalPracticeModeCheckbox">
+            <span class="practice-slider"></span>
+            <span class="practice-mode-label ensemble-label">合奏</span>
+          </label>
+        </div>
+      </section>
+
+      <div class="panel-divider"></div>
+
+      <!-- ノイズ除去セクション -->
+      <section class="panel-section" id="noiseReductionSection">
+        <span class="section-label">NOISE</span>
+        <div class="control-group">
+          <button id="noiseCalibrationBtn" class="btn noise-cal-btn" title="ノイズキャリブレーション">
+            🔇 学習
+          </button>
+          <span id="noiseStatusIndicator" class="noise-status">OFF</span>
+        </div>
+      </section>
+
+      <div class="panel-divider"></div>
+
+      <!-- 楽器選択セクション -->
+      <section class="panel-section" id="instrumentSection">
+        <span class="section-label">INST</span>
+        <div class="control-group">
+          <select id="instrumentSelect" class="instrument-select">
+            <option value="default">🎵 Default</option>
+            <optgroup label="弦楽器">
+              <option value="guitar">🎸 ギター</option>
+              <option value="bass">🎸 ベース</option>
+              <option value="violin">🎻 バイオリン</option>
+              <option value="cello">🎻 チェロ</option>
+            </optgroup>
+            <optgroup label="管楽器">
+              <option value="flute">🎵 フルート</option>
+              <option value="clarinet">🎵 クラリネット</option>
+              <option value="trumpet">🎺 トランペット</option>
+              <option value="saxophone">🎷 サックス</option>
+            </optgroup>
+            <optgroup label="その他">
+              <option value="voice">🎤 ボーカル</option>
+              <option value="piano">🎹 ピアノ</option>
+            </optgroup>
+          </select>
+        </div>
+      </section>
+
+      <div class="panel-divider"></div>
+
+      <!-- プリセット管理セクション -->
+      <section class="panel-section preset-group">
+        <span class="section-label">PRESET</span>
+        <input type="text" id="presetNameInput" class="preset-name-input" placeholder="プリセット名">
+        <button id="presetSaveBtn" class="btn">💾</button>
+        <div class="preset-dropdown">
+          <button id="presetListBtn" class="btn">📂 ▼</button>
+          <div class="preset-list" id="presetList">
+            <!-- プリセットはJSで動的生成 -->
+          </div>
+        </div>
+      </section>
+
+      <!-- プレーヤーインターフェース -->
+      <div class="player-compact disabled" id="globalPlayerInterface">
+        <button id="globalPlayPauseBtn" class="icon-btn-sm" disabled>▶</button>
+        <span id="globalCurrentTimeDisplay" class="time-sm">0:00</span>
+        <input type="range" id="globalAudioSeekBar" value="0" step="0.01" min="0" max="100" disabled>
+        <span id="globalDurationDisplay" class="time-sm">0:00</span>
+        <input type="range" id="globalVolumeSlider" class="volume-sm" min="0" max="1" step="0.01" value="1" disabled>
+        <select id="globalPlaybackRateSelect" class="rate-sm" disabled>
+          <option value="0.5">x0.5</option>
+          <option value="1.0" selected>x1</option>
+          <option value="1.5">x1.5</option>
+          <option value="2.0">x2</option>
+        </select>
+      </div>
+    </div>
+    <audio id="globalAudioEngine" style="display: none;"></audio>
+  </div>
+
+  <div class="app-body">
+    <!-- モジュールドロワー（オーバーレイ） -->
+    <aside class="module-drawer" id="moduleDrawer">
+      <div class="drawer-content">
+        <div class="drawer-header">Modules</div>
+        <div class="module-list" id="moduleList">
+          <!-- モジュールカードはJSで動的生成 -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- ワークスペース -->
+    <main class="workspace" id="workspace">
+      <!-- ルートコンテナ -->
+      <div class="layout-root" id="layoutRoot"></div>
+
+      <!-- 空の状態 -->
+      <div class="workspace-empty" id="workspaceEmpty">
+        <div class="empty-icon">📦</div>
+        <div class="empty-text">モジュールをドラッグ&ドロップ</div>
+      </div>
+
+      <!-- ドロップゾーンオーバーレイ -->
+      <div class="drop-zones" id="dropZones">
+        <!-- ワークスペースが空の時の全体ドロップエリア -->
+        <div class="drop-zone zone-center" data-zone="center"></div>
+        <!-- エッジドロップゾーン（ライン表示） -->
+        <div class="drop-zone zone-edge zone-top" data-zone="top"></div>
+        <div class="drop-zone zone-edge zone-bottom" data-zone="bottom"></div>
+        <div class="drop-zone zone-edge zone-left" data-zone="left"></div>
+        <div class="drop-zone zone-edge zone-right" data-zone="right"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- モジュールパネルテンプレート -->
+  <template id="modulePanelTemplate">
+    <div class="module-panel">
+      <header class="panel-header">
+        <span class="panel-drag-handle" title="ドラッグで移動">⋮⋮</span>
+        <h3 class="panel-title"></h3>
+        <button class="panel-menu-btn" title="メニュー">⋯</button>
+      </header>
+      <div class="panel-content"></div>
+      <div class="panel-menu">
+        <button class="menu-item delete-item">
+          <span class="menu-icon">🗑</span>
+          <span class="menu-text">削除</span>
+          <div class="delete-progress"></div>
+        </button>
+      </div>
+      <!-- パネル内ドロップゾーン -->
+      <div class="panel-drop-zones">
+        <div class="panel-drop-zone pdz-top" data-zone="top"></div>
+        <div class="panel-drop-zone pdz-bottom" data-zone="bottom"></div>
+        <div class="panel-drop-zone pdz-left" data-zone="left"></div>
+        <div class="panel-drop-zone pdz-right" data-zone="right"></div>
+      </div>
+    </div>
+  </template>
+
+  <!-- 超低遅延オーディオパイプライン -->
+  <script src="audio-core/AudioPipeline.js"></script>
+
+  <!-- 新ピッチ検出システム（世界最高精度） -->
+  <!-- Audio Core Config (最初に読み込む) -->
+  <script src="audio-core/config.js"></script>
+
+  <script src="audio-core/pitch-detection/utils/PitchUtils.js"></script>
+  <script src="audio-core/pitch-detection/postprocessing/PostProcessing.js"></script>
+  <script src="audio-core/pitch-detection/algorithms/PitchAlgorithms.js"></script>
+  <script src="audio-core/pitch-detection/algorithms/AdvancedAlgorithms.js"></script>
+  <script src="audio-core/pitch-detection/AdaptiveTrackingFilter.js"></script>
+
+  <!-- 5層解析コンポーネント -->
+  <!-- ViterbiDecoderとKalmanFilterはPostProcessing.jsで定義済み -->
+  <script src="audio-core/pitch-detection/layers/Layer1_CQT.js"></script>
+  <script src="audio-core/pitch-detection/layers/Layer4_SuperResolution.js"></script>
+  <script src="audio-core/pitch-detection/layers/Layer5_Strobe.js"></script>
+
+  <!-- 統合ピッチエンジン（全アルゴリズム統合） -->
+  <script src="audio-core/UnifiedPitchEngine.js"></script>
+  <script src="audio-core/UnifiedPitchDispatcher.js"></script>
+
+  <!-- ノイズ除去システム -->
+  <script src="audio-core/noise-reduction/NoiseReductionManager.js"></script>
+  <script src="audio-core/noise-reduction/NoiseCalibrationUI.js"></script>
+
+  <!-- PWA管理 -->
+  <script src="PWAManager.js"></script>
+  <script src="DownloadIndicatorManager.js"></script>
+
+
+  <!-- PowerManager（省電力管理） -->
+  <script src="audio-core/PowerManager.js"></script>
+  <script src="index.js"></script>
+  <script>
+    // バージョン表示を更新
+    (async function () {
+      try {
+        // Service Workerからバージョンを取得
+        const response = await fetch('./service-worker.js');
+        const text = await response.text();
+        const match = text.match(/CACHE_NAME\s*=\s*['"]([^'"]+)['"]/);
+        if (match && match[1]) {
+          const version = match[1].replace('suiren-audio-', '');
+          document.getElementById('appVersion').textContent = version;
+        }
+      } catch (e) {
+        console.log('Version fetch failed:', e);
+      }
+    })();
+  </script>
+</body>
+
+</html>
